@@ -1,9 +1,38 @@
-import { useCallback, useEffect, useState } from 'react'
-import { post } from '../api'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { post, request } from '../api'
 import { Modal } from '../components/Modal'
 import { useI18n } from '../i18n'
 
-type Server = { id?: string; serverId?: string; ip?: string; stopped?: boolean }
+type Server = { id?: string; serverId?: string; ip?: string; online?: boolean }
+type PlatformInfo = { clientApiUrl?: string; clientRpcUrl?: string; client_api_url?: string; client_rpc_url?: string }
+type Enrollment = { serverId: string; token: string; expiresAt: string }
+type StatusResponse = { clients?: Record<string, { status?: number }> }
+
+function yamlString(value: string): string { return JSON.stringify(value) }
+
+export function buildServerCompose(enrollment: Enrollment, api: string, rpc: string): string {
+  return `services:
+  frps:
+    image: onicc/frp-panel:edge
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - server
+      - --config
+      - /data/server.yaml
+      - --enrollment-token
+      - ${yamlString(enrollment.token)}
+      - --api-url
+      - ${yamlString(api)}
+      - --rpc-url
+      - ${yamlString(rpc)}
+    volumes:
+      - frp-panel-server-data:/data
+
+volumes:
+  frp-panel-server-data:
+`
+}
 
 export default function Servers() {
   const { t } = useI18n()
@@ -11,16 +40,47 @@ export default function Servers() {
   const [open, setOpen] = useState(false)
   const [serverId, setServerId] = useState('')
   const [serverIp, setServerIp] = useState('')
-  const refresh = useCallback(async () => setServers((await post<{ servers?: Server[] }>('/api/v1/server/list', { page: 1, pageSize: 100 })).servers ?? []), [])
-  useEffect(() => { void refresh() }, [refresh])
+  const [bindPort, setBindPort] = useState(7000)
+  const [deployment, setDeployment] = useState<Enrollment | null>(null)
+  const [platform, setPlatform] = useState<PlatformInfo>({})
+  const [copied, setCopied] = useState(false)
+
+  const refresh = useCallback(async () => {
+    const listed = (await post<{ servers?: Server[] }>('/api/v1/server/list', { page: 1, pageSize: 100 })).servers ?? []
+    const ids = listed.map((server) => server.id ?? server.serverId ?? '').filter(Boolean)
+    if (ids.length === 0) { setServers(listed); return }
+    const status = await post<StatusResponse>('/api/v1/platform/clientsstatus', { clientType: 2, clientIds: ids }).catch(() => ({} as StatusResponse))
+    setServers(listed.map((server) => {
+      const id = server.id ?? server.serverId ?? ''
+      return { ...server, online: status.clients?.[id]?.status === 1 }
+    }))
+  }, [])
+
+  useEffect(() => {
+    void refresh()
+    void request<PlatformInfo>('/api/v1/platform/baseinfo').then(setPlatform).catch(() => undefined)
+  }, [refresh])
+
   async function create() {
-    const response = await post<{ status?: { code?: number; message?: string } }>('/api/v1/server/init', { serverId, serverIp })
-    if (response.status?.code !== undefined && response.status.code !== 0) throw new Error(response.status.message || t('error'))
-    setServerId(''); setServerIp(''); await refresh()
+    const result = await post<Enrollment>('/api/v2/server-enrollments', { serverId, serverIp, bindPort })
+    setDeployment(result)
+    setServerId('')
+    setServerIp('')
+    setBindPort(7000)
+    await refresh()
   }
+
+  const compose = useMemo(() => {
+    if (!deployment) return ''
+    const api = platform.clientApiUrl || platform.client_api_url || window.location.origin
+    const rpc = platform.clientRpcUrl || platform.client_rpc_url || `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`
+    return buildServerCompose(deployment, api, rpc)
+  }, [deployment, platform])
+
   return <>
-    <header className="page-header"><div><span className="eyebrow">Ingress</span><h1>{t('servers')}</h1><p>Built-in FRPS stays available as the default server.</p></div><button className="button primary" onClick={() => setOpen(true)}>＋ {t('createServer')}</button></header>
-    <section className="panel table-panel"><table><thead><tr><th>{t('serverId')}</th><th>{t('serverIp')}</th><th>Status</th></tr></thead><tbody>{servers.map((server) => <tr key={server.id ?? server.serverId}><td><strong>{server.id ?? server.serverId}</strong></td><td>{server.ip || '—'}</td><td><span className={server.stopped ? 'status offline' : 'status online'}>{server.stopped ? t('offline') : t('online')}</span></td></tr>)}</tbody></table>{servers.length === 0 && <div className="empty">{t('noData')}</div>}</section>
-    <Modal open={open} onOpenChange={setOpen} title={t('createServer')} onSubmit={create}><label>{t('serverId')}<input value={serverId} onChange={(event) => setServerId(event.target.value)} pattern="[A-Za-z0-9_-]+" required autoFocus /></label><label>{t('serverIp')}<input value={serverIp} onChange={(event) => setServerIp(event.target.value)} required /></label></Modal>
+    <header className="page-header"><div><span className="eyebrow">Data plane</span><h1>{t('servers')}</h1><p>{t('serverTopologyHint')}</p></div><div className="header-actions"><button className="button secondary" onClick={() => void refresh()}>{t('refresh')}</button><button className="button primary" onClick={() => setOpen(true)}>＋ {t('createServer')}</button></div></header>
+    {deployment && <section className="install-card"><div className="panel-heading"><div><h2>{t('deployServer')}</h2><p>{t('serverTokenHint')}</p></div><button className="icon-button" aria-label="Close" onClick={() => setDeployment(null)}>×</button></div><pre><code>{compose}</code></pre><button className="button secondary" onClick={async () => { await navigator.clipboard.writeText(compose); setCopied(true); window.setTimeout(() => setCopied(false), 1500) }}>{copied ? t('copied') : t('copyCompose')}</button></section>}
+    <section className="panel table-panel"><table><thead><tr><th>{t('serverId')}</th><th>{t('serverIp')}</th><th>{t('status')}</th></tr></thead><tbody>{servers.map((server) => <tr key={server.id ?? server.serverId}><td><strong>{server.id ?? server.serverId}</strong></td><td>{server.ip || '—'}</td><td><span className={server.online ? 'status online' : 'status offline'}>{server.online ? t('online') : t('offline')}</span></td></tr>)}</tbody></table>{servers.length === 0 && <div className="empty">{t('noData')}</div>}</section>
+    <Modal open={open} onOpenChange={setOpen} title={t('createServer')} submitLabel={t('createDeployment')} onSubmit={create}><label>{t('serverId')}<input value={serverId} onChange={(event) => setServerId(event.target.value)} pattern="[A-Za-z0-9_-]+" required autoFocus /></label><label>{t('serverIp')}<input value={serverIp} onChange={(event) => setServerIp(event.target.value)} placeholder="frps.example.com" required /></label><label>{t('bindPort')}<input type="number" min="1024" max="65535" value={bindPort} onChange={(event) => setBindPort(Number(event.target.value))} required /></label><p className="field-help">{t('serverCreateHint')}</p></Modal>
   </>
 }

@@ -1,22 +1,23 @@
 # v2 architecture
 
-frp-panel v2 deliberately breaks v1 packaging and database compatibility. It has two deliverables:
+frp-panel v2 deliberately breaks v1 packaging and database compatibility. It has three independently managed roles:
 
-1. `frp-panel` is the Linux controller. It serves the Web console and API, accepts Agent RPC connections, and runs the default embedded FRPS.
-2. `frp-panel-agent` is the node program for Linux, macOS, and Windows. It runs FRPC and reports only the optional capabilities available on that OS.
+1. `frp-panel master` is the single Linux control plane. It serves the Web console/API and accepts managed RPC connections; it carries no tunnel traffic.
+2. `frp-panel server` is an independently deployed Linux FRPS data plane. Any number of Server instances enroll with the Master and receive their FRPS configuration.
+3. `frp-panel-agent` is the Client program for Linux, macOS, and Windows. It runs one managed FRPC configuration per assigned Server route and reports only the optional capabilities available on that OS.
 
 ## Current control flow
 
-The browser authenticates with an HttpOnly, Secure, SameSite=Strict cookie. The controller authorizes every route from the user's stored role. Creating a node produces a random, hashed, ten-minute enrollment token. Its first redemption atomically consumes it and returns a distinct long-lived node credential; replay is rejected.
+The browser authenticates with an HttpOnly, Secure, SameSite=Strict cookie. The controller authorizes every route from the user's stored role. Creating a Server or node produces a random, hashed, ten-minute enrollment token. Its first redemption atomically consumes it and returns a distinct long-lived credential; replay is rejected.
 
-After enrollment, the Agent uses the established RPC transport to receive FRPC configuration and report status. `internal/protocol/v2` defines capability and revision message types for the next transport migration, but revision-based desired-state delivery is not yet the active Agent transport. Keeping that boundary explicit prevents the documentation from promising semantics that are not deployed.
+After enrollment, Servers pull FRPS configuration and Agents pull every child FRPC configuration represented by an explicit node-to-Server route. Online additions are pushed immediately and periodic reconciliation applies offline changes. `internal/protocol/v2` defines capability and revision message types for the next transport migration, but revision-based desired-state delivery is not yet the active Agent transport.
 
 ## Storage and networking
 
 - SQLite is the single-node default; PostgreSQL is supported for external storage.
 - A monotonic `schema_migrations` registry replaces startup `AutoMigrate`. v2 does not import a v1 database.
 - Public API/RPC addresses are explicit configuration and are never inferred from a listen socket.
-- The controller container runs as UID/GID `10001`; persistent data is under `/data`.
+- Master and Server containers run as UID/GID `10001`. Master state and each Server credential live in separate `/data` volumes.
 
 ## Web console contract
 

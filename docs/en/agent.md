@@ -46,4 +46,4 @@ Apple notarization and Windows Authenticode are not provided yet. Verify downloa
 
 The bootstrap and `update` default to the rolling `edge` release. Production should pass an evaluated `v*` tag explicitly, or use `--version latest` for the latest stable release.
 
-See the [deployment guide](/en/deployment) for the complete Master, embedded Server, and Client rollout sequence.
+See the [deployment guide](/en/deployment) for the complete Master, independent Server, Client, and route-assignment rollout.

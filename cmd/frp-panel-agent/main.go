@@ -161,13 +161,17 @@ func configForInstall(cmd *cobra.Command, path string) (agent.Config, error) {
 		if err != nil {
 			return agent.Config{}, fmt.Errorf("enroll agent: %w", err)
 		}
-		if nodeID != "" && !strings.HasSuffix(joined.NodeID, ".c."+nodeID) {
+		if !nodeIDMatchesEnrollment(nodeID, joined.NodeID) {
 			return agent.Config{}, fmt.Errorf("enrollment token belongs to a different node")
 		}
 		result.Credentials.NodeID = joined.NodeID
 		result.Credentials.Secret = joined.Secret
 	}
 	return result, nil
+}
+
+func nodeIDMatchesEnrollment(requested, enrolled string) bool {
+	return requested == "" || enrolled == requested || strings.HasSuffix(enrolled, ".c."+requested)
 }
 
 func newDoctorCommand() *cobra.Command {

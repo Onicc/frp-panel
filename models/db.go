@@ -60,6 +60,16 @@ var migrations = []migration{
 			return nil
 		},
 	},
+	{
+		version: 2,
+		name:    "create_server_enrollments",
+		up: func(tx *gorm.DB) error {
+			if tx.Migrator().HasTable(&ServerEnrollment{}) {
+				return nil
+			}
+			return tx.Migrator().CreateTable(&ServerEnrollment{})
+		},
+	},
 }
 
 func runMigrations(db *gorm.DB) error {

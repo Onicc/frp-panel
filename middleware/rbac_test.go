@@ -15,6 +15,9 @@ func TestRolePermissionsUseCurrentStoredRoleRules(t *testing.T) {
 		{defs.UserRole_Viewer, "POST", "/api/v1/client/list", true},
 		{defs.UserRole_Viewer, "POST", "/api/v1/client/delete", false},
 		{defs.UserRole_Operator, "POST", "/api/v2/enrollments", true},
+		{defs.UserRole_Operator, "POST", "/api/v2/server-enrollments", true},
+		{defs.UserRole_Operator, "POST", "/api/v2/node-routes", true},
+		{defs.UserRole_Operator, "DELETE", "/api/v2/node-routes", true},
 		{defs.UserRole_Operator, "POST", "/api/v1/user/admin-update", false},
 		{defs.UserRole_Admin, "DELETE", "/api/v2/anything", true},
 	}

@@ -241,26 +241,6 @@ func NewClientCred(appInstance app.Application) credentials.TransportCredentials
 	return cred
 }
 
-func NewDefaultServerConfig(ctx *app.Context) conf.Config {
-	appInstance := ctx.GetApp()
-
-	logger.Logger(ctx).Infof("init default internal server")
-
-	dao.NewMutation(ctx).InitDefaultServer(appInstance.GetConfig().Master.APIHost)
-	defaultServer, err := dao.NewQuery(ctx).GetDefaultServer()
-
-	if err != nil {
-		logger.Logger(ctx).WithError(err).Fatal("get default server failed")
-	}
-
-	tmpCfg := appInstance.GetConfig()
-	tmpCfg.Client.ID = defaultServer.ServerID
-	tmpCfg.Client.Secret = defaultServer.ConnectSecret
-	appInstance.SetConfig(tmpCfg)
-
-	return tmpCfg
-}
-
 const splitter = "\n--------------------------------------------\n"
 
 func NewConfigPrinter(param struct {

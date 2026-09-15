@@ -199,10 +199,7 @@ func (s *server) ServerSend(sender pb.Master_ServerSendServer) error {
 				cliType = defs.CliTypeServer
 			}
 
-			secretValid := secret == req.GetSecret()
-			if cliType == defs.CliTypeClient {
-				secretValid = utils.CheckCredential(req.GetSecret(), secret)
-			}
+			secretValid := utils.CheckCredential(req.GetSecret(), secret)
 			if !secretValid {
 				logger.Logger(ctx).Errorf("invalid secret, %s id: [%s]", req.GetEvent().String(), req.GetClientId())
 				sender.Send(&pb.ServerMessage{

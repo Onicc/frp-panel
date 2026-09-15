@@ -6,7 +6,7 @@ An open-source FRP control plane with a secure Web console and a cross-platform 
 
 ## What changed
 
-- Separate `frp-panel` controller and lightweight `frp-panel-agent` deliverables.
+- Separate Master control plane, independently deployable FRPS data planes, and lightweight `frp-panel-agent` nodes.
 - Linux amd64/arm64, macOS amd64/arm64, and Windows amd64/arm64 Agent builds.
 - Correct system installation paths; the bootstrap command never installs into the current directory.
 - Vite 8 / React 19 bilingual console with controlled mutation dialogs.
@@ -16,37 +16,11 @@ An open-source FRP control plane with a secure Web console and a cross-platform 
 
 ## Deploy Master, Server, and Client
 
-Master provides the control plane, while the default Server (FRPS) is embedded in the same controller container. A Client is `frp-panel-agent` plus managed FRPC on a node. Start by creating the Docker Compose `.env` file:
+Deploy exactly one Master with the repository Compose file. Master owns the Web console and desired state but carries no proxy traffic. Create any number of Servers in **Servers**; each creation returns a one-time Docker Compose deployment for an independent FRPS host. Create Clients in **Nodes**, install them with the generated Linux, macOS, or Windows command, then assign their FRPS routes from the same page. One Client may use multiple Servers.
 
-```bash
-openssl rand -hex 32
-```
+Both Server and Client bootstrap tokens expire after ten minutes and can be redeemed only once. Persistent credentials are hashed in Master and stored only in protected files or volumes on the managed host.
 
-```dotenv
-APP_GLOBAL_SECRET=REPLACE_ME
-APP_COOKIE_SECURE=true
-APP_ENABLE_REGISTER=true
-PUBLIC_HOST=panel.example.com
-MASTER_API_SCHEME=https
-CLIENT_API_URL=https://panel.example.com
-CLIENT_RPC_URL=wss://panel.example.com
-```
-
-Replace `REPLACE_ME` with the random value generated above.
-
-Point an HTTPS reverse proxy at `127.0.0.1:9000`, then start the stack:
-
-```bash
-docker compose config --quiet
-docker compose pull
-docker compose up -d
-```
-
-Immediately set `APP_ENABLE_REGISTER=false` and reapply Compose after creating the initial Owner. Embedded FRPS uses `7000`; every proxy remote port must also be published explicitly.
-
-A Client must be installed with the ten-minute one-time command from **Nodes → Add node**. The console provides Linux, macOS, and Windows commands with the public API/RPC endpoints included.
-
-See the [deployment guide](docs/en/deployment.md) for reverse proxy, port, backup, upgrade, and Client verification instructions.
+See the [deployment guide](docs/en/deployment.md) for the complete Master → Server → Client rollout, raw Compose files, environment configuration, ports, and backup checks.
 
 ## Client installation locations
 

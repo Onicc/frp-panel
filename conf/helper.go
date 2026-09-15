@@ -35,7 +35,7 @@ func MasterAPIListenAddr(cfg Config) string {
 }
 
 func ServerAPIListenAddr(cfg Config) string {
-	return fmt.Sprintf(":%d", cfg.Server.APIPort)
+	return fmt.Sprintf("%s:%d", defs.LocalHost, cfg.Server.APIPort)
 }
 
 func FRPsAuthOption(cfg Config) v1.HTTPPluginOptions {
@@ -72,7 +72,8 @@ func PermissionsForRole(role string) []defs.APIPermission {
 	case defs.UserRole_Operator:
 		permissions = append(permissions,
 			defs.APIPermission{Method: "POST", Path: `^/api/v1/(client|server|frpc|frps|proxy|wg|worker)(/.*)?$`},
-			defs.APIPermission{Method: "POST", Path: `^/api/v2/enrollments$`},
+			defs.APIPermission{Method: "POST", Path: `^/api/v2/(enrollments|server-enrollments|node-routes)$`},
+			defs.APIPermission{Method: "DELETE", Path: `^/api/v2/node-routes$`},
 		)
 	}
 	return permissions

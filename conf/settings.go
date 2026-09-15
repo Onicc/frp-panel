@@ -31,13 +31,12 @@ type Config struct {
 		GithubProxyUrl string `env:"GITHUB_PROXY_URL" env-description:"optional explicitly trusted github proxy url"`
 	} `env-prefix:"APP_"`
 	Master struct {
-		APIPort               int    `env:"API_PORT" env-default:"9000" env-description:"master api port"`
-		APIHost               string `env:"API_HOST" env-description:"master host, can behind proxy like cdn"`
-		APIScheme             string `env:"API_SCHEME" env-default:"http" env-description:"master api scheme"`
-		CacheSize             int    `env:"CACHE_SIZE" env-default:"10" env-description:"cache size in MB"`
-		RPCHost               string `env:"RPC_HOST" env-default:"127.0.0.1" env-description:"master host, is a public ip or domain"`
-		RPCPort               int    `env:"RPC_PORT" env-default:"9001" env-description:"master rpc port"`
-		InternalFRPServerHost string `env:"INTERNAL_FRP_SERVER_HOST" env-description:"internal frp server host, used for client connection"`
+		APIPort   int    `env:"API_PORT" env-default:"9000" env-description:"master api port"`
+		APIHost   string `env:"API_HOST" env-description:"master host, can behind proxy like cdn"`
+		APIScheme string `env:"API_SCHEME" env-default:"http" env-description:"master api scheme"`
+		CacheSize int    `env:"CACHE_SIZE" env-default:"10" env-description:"cache size in MB"`
+		RPCHost   string `env:"RPC_HOST" env-default:"127.0.0.1" env-description:"master host, is a public ip or domain"`
+		RPCPort   int    `env:"RPC_PORT" env-default:"9001" env-description:"master rpc port"`
 	} `env-prefix:"MASTER_"`
 	Server struct {
 		APIPort int `env:"API_PORT" env-default:"8999" env-description:"server api port"`
@@ -143,10 +142,6 @@ func DefaultConfig() Config {
 }
 
 func (cfg *Config) Complete() {
-	if len(cfg.Master.InternalFRPServerHost) == 0 {
-		cfg.Master.InternalFRPServerHost = cfg.Master.RPCHost
-	}
-
 	if len(cfg.Master.APIHost) == 0 {
 		cfg.Master.APIHost = cfg.Master.RPCHost
 	}

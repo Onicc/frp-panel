@@ -1,43 +1,21 @@
 # 快速开始
 
-Master 提供控制面，Server 是 Master 内置的默认 FRPS，Client 则是安装在 Linux、macOS 或 Windows 节点上的 Agent 与受管 FRPC。当前版本使用一个 Docker Compose 服务同时部署 Master 和 Server，再从前端生成 Client 安装命令。
+frp-panel 采用 **一个 Master、多个独立 FRPS Server、多个 FRPC Client** 的结构。Master 只负责控制面，业务流量直接经过所选 FRPS。
 
-## 1. 配置 Master 与 Server
+## 1. Master
 
-复制仓库的 `compose.yaml`，生成至少 32 字节的随机密钥，并创建 `.env`：
+使用仓库 `compose.yaml` 部署唯一的 Master，并按 `.env.sample` 设置 `APP_GLOBAL_SECRET`、公网 HTTPS API 与 WSS RPC 地址。首次创建 Owner 时临时启用注册，创建完成后立即关闭。
 
-```bash
-openssl rand -hex 32
-```
+## 2. Server（FRPS）
 
-```dotenv
-APP_GLOBAL_SECRET=REPLACE_ME
-APP_COOKIE_SECURE=true
-APP_ENABLE_REGISTER=true
-PUBLIC_HOST=panel.example.com
-MASTER_API_SCHEME=https
-CLIENT_API_URL=https://panel.example.com
-CLIENT_RPC_URL=wss://panel.example.com
-```
+登录后打开 **服务端 → 创建服务端**，填写目标机器的公网地址和绑定端口。保存后控制台会显示完整 `compose.yaml`；将它部署到对应 Linux 服务器。每个 FRPS 主机都应单独创建，不共享生成文件或数据卷。
 
-把 `REPLACE_ME` 替换为上一步生成的随机值。
+## 3. Client（FRPC）
 
-将 HTTPS 反向代理指向 `127.0.0.1:9000`，然后启动：
+打开 **节点 → 添加节点**，选择 Linux、macOS 或 Windows，并在目标节点执行控制台生成的一次性安装命令。安装程序会写入系统规范目录并注册本机服务。
 
-```bash
-docker compose config --quiet
-docker compose pull
-docker compose up -d
-```
+## 4. 分配链路
 
-首次启动时临时开放注册，在 Web 控制台创建唯一的初始 Owner。创建成功后将 `APP_ENABLE_REGISTER=false`，再执行 `docker compose up -d`。内置 FRPS 使用 `7000`；每个代理使用的 remote port 也必须在 Compose 中映射。
+在 **节点** 页为每个 Client 添加需要连接的 FRPS。可以让不同 Client 使用不同 Server，也可以让同一 Client 同时连接多个 Server。之后再为“节点 + Server”组合配置隧道。
 
-## 2. 安装 Client
-
-登录后打开 **节点 → 添加节点**，填写名称并创建 10 分钟有效的一次性注册命令。选择 Linux、macOS 或 Windows 标签页并在目标机器执行。令牌兑换一次即失效。
-
-## 3. 检查状态
-
-在控制台确认 `default` Server 与新节点在线，再使用对应系统的服务管理器检查 `frp-panel-agent`。完整命令见 [Client / Agent 安装与维护](/agent)。
-
-生产部署、反向代理、端口、备份与升级步骤见 [部署指南](/deployment)。上线前同时阅读 [配置](/configuration) 与 [安全基线](/SECURITY)。
+完整的原始 Compose、环境变量、端口、验收和备份说明见 [部署指南](/deployment)。

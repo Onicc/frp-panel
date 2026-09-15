@@ -46,4 +46,4 @@ macOS 尚未进行 Apple 公证，Windows 尚未提供 Authenticode 签名。稳
 
 引导脚本和 `update` 默认跟随滚动的 `edge` 发布；生产环境应显式传入经过评估的 `v*` 标签，或使用 `--version latest` 选择最新稳定版本。
 
-Master、内置 Server 和 Client 的完整上线顺序见 [部署指南](/deployment)。
+Master、独立 Server 和 Client 的完整上线顺序及链路分配见 [部署指南](/deployment)。

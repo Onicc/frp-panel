@@ -2,12 +2,13 @@
 
 | Component | Platform | Architectures | Service manager | FRPC | Functions | Remote shell | WireGuard |
 |---|---|---|---|---|---|---|---|
-| Controller | Linux / Docker | amd64, arm64 | container | n/a | controller API | n/a | Linux host support required |
+| Master | Linux / Docker | amd64, arm64 | container | n/a | controller API | n/a | Linux host support required |
+| Server / FRPS | Linux / Docker | amd64, arm64 | container | n/a | n/a | n/a | n/a |
 | Agent | Linux | amd64, arm64 | systemd | yes | optional | optional | optional |
 | Agent | macOS 13.5+ | amd64, arm64 | launchd | yes | optional | optional | no |
 | Agent | Windows 11 / Server 2022+ | amd64, arm64 | Windows SCM | yes | no | optional | no |
 
-The Agent does not run FRPS in v2; the controller owns the embedded FRPS. Optional privileged features are disabled unless explicitly enabled in protected Agent configuration. Enabling Functions also requires an absolute path to an operator-installed `workerd` binary. Unsupported capabilities fail validation instead of being silently attempted, and disabled privileged RPC events are rejected by the Agent.
+The Agent does not run FRPS. Every FRPS is a separate Server container managed by the single Master and uses Linux host networking for dynamic tunnel ports. Optional privileged features are disabled unless explicitly enabled in protected Agent configuration. Enabling Functions also requires an absolute path to an operator-installed `workerd` binary. Unsupported capabilities fail validation instead of being silently attempted, and disabled privileged RPC events are rejected by the Agent.
 
 ## Installation locations
 

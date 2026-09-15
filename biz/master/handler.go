@@ -62,7 +62,6 @@ func ConfigureRouter(appInstance app.Application, router *gin.Engine) {
 		serverRouter := v1.Group("/server")
 		{
 			serverRouter.POST("/get", app.Wrapper(appInstance, server.GetServerHandler))
-			serverRouter.POST("/init", app.Wrapper(appInstance, server.InitServerHandler))
 			serverRouter.POST("/delete", app.Wrapper(appInstance, server.DeleteServerHandler))
 			serverRouter.POST("/list", app.Wrapper(appInstance, server.ListServersHandler))
 		}

@@ -6,7 +6,7 @@
 
 ## 主要变化
 
-- 控制器 `frp-panel` 与轻量节点程序 `frp-panel-agent` 分离发布。
+- Master 控制面、可独立部署的 FRPS 数据面与轻量节点程序 `frp-panel-agent` 相互分离。
 - Agent 支持 Linux、macOS、Windows 的 amd64/arm64 主流平台。
 - 安装命令写入系统规范目录，不再污染执行命令时的当前目录。
 - 使用 Vite 8 / React 19 重写中英文控制台；创建、编辑成功后统一关闭并重置弹窗，失败时保留现场。
@@ -16,37 +16,11 @@
 
 ## 部署 Master、Server 与 Client
 
-Master 提供控制面，默认 Server（FRPS）内置在同一个控制器容器中；Client 是安装到节点上的 `frp-panel-agent` 与受管 FRPC。先为 Docker Compose 创建 `.env`：
+使用仓库 Compose 文件部署唯一的 Master。Master 只负责 Web 控制台和期望配置，不承载代理流量。在 **服务端** 中创建任意数量的 Server；每次创建都会生成一份带一次性令牌的 FRPS Docker Compose 部署。在 **节点** 中创建 Client，使用生成的 Linux、macOS 或 Windows 命令安装，再在同一页面分配 FRPS 链路。同一个 Client 可以连接多个 Server。
 
-```bash
-openssl rand -hex 32
-```
+Server 和 Client 的注册令牌都在 10 分钟后过期且只能兑换一次。长期凭据在 Master 中仅保存哈希，明文只写入受管主机的受保护文件或数据卷。
 
-```dotenv
-APP_GLOBAL_SECRET=REPLACE_ME
-APP_COOKIE_SECURE=true
-APP_ENABLE_REGISTER=true
-PUBLIC_HOST=panel.example.com
-MASTER_API_SCHEME=https
-CLIENT_API_URL=https://panel.example.com
-CLIENT_RPC_URL=wss://panel.example.com
-```
-
-把 `REPLACE_ME` 替换为上一步生成的随机值。
-
-将 HTTPS 反向代理指向 `127.0.0.1:9000`，然后启动：
-
-```bash
-docker compose config --quiet
-docker compose pull
-docker compose up -d
-```
-
-创建初始 Owner 后立即将 `APP_ENABLE_REGISTER=false` 并重新应用 Compose。内置 FRPS 默认使用 `7000`；各代理使用的 remote port 也必须显式映射。
-
-Client 必须使用前端 **节点 → 添加节点** 中生成的 10 分钟一次性命令安装。控制台提供 Linux、macOS 和 Windows 命令，并自动带入公开 API/RPC 地址。
-
-完整的反向代理、端口、备份、升级和 Client 验证步骤见 [部署指南](docs/deployment.md)。
+完整的 Master → Server → Client 顺序、原始 Compose 文件、环境变量、端口与备份检查见 [部署指南](docs/deployment.md)。
 
 ## Client 安装位置
 

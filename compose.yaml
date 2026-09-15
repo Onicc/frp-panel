@@ -1,5 +1,5 @@
 services:
-  controller:
+  master:
     image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:edge}
     restart: unless-stopped
     environment:
@@ -9,14 +9,10 @@ services:
       MASTER_API_HOST: ${PUBLIC_HOST:?set the public controller hostname}
       MASTER_API_SCHEME: ${MASTER_API_SCHEME:-https}
       MASTER_RPC_HOST: ${PUBLIC_HOST:?set the public controller hostname}
-      CLIENT_API_URL: ${CLIENT_API_URL:?set the public API URL used by Agents}
-      CLIENT_RPC_URL: ${CLIENT_RPC_URL:?set the public RPC URL used by Agents}
+      CLIENT_API_URL: ${CLIENT_API_URL:?set the public API URL used by managed components}
+      CLIENT_RPC_URL: ${CLIENT_RPC_URL:?set the public RPC URL used by managed components}
     ports:
       - "127.0.0.1:9000:9000"
-      - "7000:7000"
-      # Publish every TCP/UDP remote port used by a proxy, for example:
-      # - "10000-10100:10000-10100/tcp"
-      # - "10000-10100:10000-10100/udp"
     volumes:
       - frp-panel-data:/data
     healthcheck:

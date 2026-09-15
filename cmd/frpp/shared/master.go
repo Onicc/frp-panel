@@ -5,7 +5,6 @@ import (
 
 	"github.com/Onicc/frp-panel/biz/master/auth"
 	"github.com/Onicc/frp-panel/biz/master/proxy"
-	"github.com/Onicc/frp-panel/conf"
 	"github.com/Onicc/frp-panel/services/app"
 	"github.com/Onicc/frp-panel/services/cache"
 	"github.com/Onicc/frp-panel/services/master"
@@ -23,18 +22,17 @@ type runMasterParam struct {
 
 	Lc fx.Lifecycle
 
-	Ctx                 *app.Context
-	AppInstance         app.Application
-	DBManagerMgr        app.DBManager
-	HTTPMuxServer       mux.MuxServer `name:"httpMux"`
-	TLSMuxServer        mux.MuxServer `name:"tlsMux"`
-	MasterRouter        *gin.Engine   `name:"masterRouter"`
-	ClientLogManager    app.ClientLogManager
-	WsGrpcHandler       gin.HandlerFunc      `name:"wsGrpcHandler"`
-	MasterService       master.MasterService `name:"wsMasterService"`
-	TaskManager         watcher.Client       `name:"masterTaskManager"`
-	WsListener          *wsgrpc.WSListener
-	DefaultServerConfig conf.Config `name:"defaultServerConfig"`
+	Ctx              *app.Context
+	AppInstance      app.Application
+	DBManagerMgr     app.DBManager
+	HTTPMuxServer    mux.MuxServer `name:"httpMux"`
+	TLSMuxServer     mux.MuxServer `name:"tlsMux"`
+	MasterRouter     *gin.Engine   `name:"masterRouter"`
+	ClientLogManager app.ClientLogManager
+	WsGrpcHandler    gin.HandlerFunc      `name:"wsGrpcHandler"`
+	MasterService    master.MasterService `name:"wsMasterService"`
+	TaskManager      watcher.Client       `name:"masterTaskManager"`
+	WsListener       *wsgrpc.WSListener
 }
 
 func runMaster(param runMasterParam) {

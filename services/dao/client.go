@@ -104,7 +104,9 @@ func (q *clientQuery) GetClientsByClientIDs(userInfo models.UserInfo, clientIDs 
 
 	db := q.ctx.GetApp().GetDBManager().GetDefaultDB()
 	cs := []*models.Client{}
-	err := db.Where("client_id IN ?", clientIDs).Find(&cs).Error
+	err := db.Where(&models.Client{ClientEntity: &models.ClientEntity{
+		UserID: userInfo.GetUserID(), TenantID: userInfo.GetTenantID(),
+	}}).Where("client_id IN ?", clientIDs).Find(&cs).Error
 	if err != nil {
 		return nil, err
 	}

@@ -88,6 +88,106 @@ paths:
                   secret: { type: string, writeOnly: true }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
+  /server-enrollments:
+    post:
+      operationId: createServerEnrollment
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [serverId, serverIp]
+              properties:
+                serverId: { type: string, pattern: '^[A-Za-z0-9_-]+$' }
+                serverIp: { type: string, description: Public IP address or DNS hostname without a scheme or port. }
+                bindPort: { type: integer, minimum: 1024, maximum: 65535, default: 7000 }
+      responses:
+        '201':
+          description: One-use FRPS enrollment valid for ten minutes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServerEnrollment' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /server/enroll:
+    post:
+      operationId: redeemServerEnrollment
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, minLength: 32, maxLength: 256 }
+      responses:
+        '200':
+          description: Permanent FRPS credential returned once and never stored in plaintext by Master.
+          headers:
+            Cache-Control: { schema: { const: no-store } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [serverId, secret]
+                properties:
+                  serverId: { type: string }
+                  secret: { type: string, writeOnly: true }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /node-routes:
+    get:
+      operationId: listNodeRoutes
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Explicit FRPC-to-FRPS route assignments.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [routes]
+                properties:
+                  routes:
+                    type: array
+                    items: { $ref: '#/components/schemas/NodeRoute' }
+        '401': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createNodeRoute
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeRouteMutation' }
+      responses:
+        '201':
+          description: Route created or reconciled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NodeRoute' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteNodeRoute
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NodeRouteMutation' }
+      responses:
+        '204': { description: Route removed. }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearerAuth:
@@ -106,6 +206,27 @@ components:
         nodeId: { type: string }
         token: { type: string, writeOnly: true }
         expiresAt: { type: string, format: date-time }
+    ServerEnrollment:
+      type: object
+      required: [serverId, token, expiresAt]
+      properties:
+        serverId: { type: string }
+        token: { type: string, writeOnly: true }
+        expiresAt: { type: string, format: date-time }
+    NodeRoute:
+      type: object
+      required: [nodeId, serverIds]
+      properties:
+        nodeId: { type: string }
+        serverIds:
+          type: array
+          items: { type: string }
+    NodeRouteMutation:
+      type: object
+      required: [nodeId, serverId]
+      properties:
+        nodeId: { type: string }
+        serverId: { type: string }
     Problem:
       type: object
       required: [type, title, status]

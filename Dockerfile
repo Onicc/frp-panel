@@ -44,7 +44,7 @@ RUN apk add --no-cache ca-certificates tzdata && addgroup -S -g 10001 frp-panel 
 COPY --from=controller-build /out/frp-panel /usr/local/bin/frp-panel
 USER 10001:10001
 VOLUME ["/data"]
-EXPOSE 9000 9001 7000
+EXPOSE 9000 9001
 ENV DB_TYPE=sqlite3 DB_DSN=/data/frp-panel.db?_pragma=journal_mode(WAL)
 ENTRYPOINT ["/usr/local/bin/frp-panel"]
 CMD ["master"]

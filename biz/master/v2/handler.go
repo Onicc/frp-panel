@@ -23,14 +23,19 @@ func Configure(router *gin.RouterGroup, appInstance app.Application) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "time": time.Now().UTC(), "protocol": protocol.Version})
 	})
 	router.POST("/agent/enroll", middleware.LoginRateLimit(), redeemEnrollment(appInstance))
+	router.POST("/server/enroll", middleware.LoginRateLimit(), redeemServerEnrollment(appInstance))
 	protected := router.Group("", middleware.JWTAuth(appInstance), middleware.AuthCtx(appInstance), middleware.RBAC(appInstance))
 	protected.GET("/capabilities", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"controller": gin.H{"os": "linux", "docker": true, "embeddedFrps": true},
+			"controller": gin.H{"os": "linux", "docker": true, "embeddedFrps": false, "standaloneFrps": true},
 			"agent":      protocol.CurrentCapabilities(),
 		})
 	})
 	protected.POST("/enrollments", createEnrollment(appInstance))
+	protected.POST("/server-enrollments", createServerEnrollment(appInstance))
+	protected.GET("/node-routes", listNodeRoutes(appInstance))
+	protected.POST("/node-routes", createNodeRoute(appInstance))
+	protected.DELETE("/node-routes", deleteNodeRoute(appInstance))
 }
 
 func AbortProblem(c *gin.Context, status int, title, detail string) {

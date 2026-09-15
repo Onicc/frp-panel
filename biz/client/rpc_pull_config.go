@@ -37,7 +37,7 @@ func PullConfig(appInstance app.Application, clientID, clientSecret string) erro
 
 	if len(resp.GetClient().GetOriginClientId()) == 0 {
 		currentClientIDs := ctrl.List()
-		if idsToRemove, _ := lo.Difference(resp.GetClient().GetClientIds(), currentClientIDs); len(idsToRemove) > 0 {
+		if _, idsToRemove := lo.Difference(resp.GetClient().GetClientIds(), currentClientIDs); len(idsToRemove) > 0 {
 			logger.Logger(ctx).Infof("client [%s] has %d expired child clients, remove clientIDs: [%+v]", clientID, len(idsToRemove), idsToRemove)
 			for _, id := range idsToRemove {
 				ctrl.StopByClient(id)

@@ -1,32 +1,35 @@
 # 部署指南
 
-## 组件说明
+## 1. 先理解三个角色
 
-| 组件 | 作用 | 部署方式 |
-|---|---|---|
-| Master | Web 控制台、API、用户和配置管理、节点控制连接 | Docker Compose |
-| Server | FRPS 数据入口，将公网流量转发到 Client | 内置在 Master 容器中，ID 为 `default` |
-| Client | 节点上的 `frp-panel-agent` 和受管 FRPC | 使用前端生成的安装命令 |
+| 角色 | 数量 | 职责 | 默认部署方式 |
+|---|---:|---|---|
+| Master | 1 | Web 控制台、API、用户、配置和连接调度；不承载代理流量 | Docker Compose |
+| Server（FRPS） | 1 至多个 | 公网数据入口，接收 FRPC 连接和业务流量 | 每台服务器使用 Docker Compose |
+| Client（FRPC） | 1 至多个 | 运行在需要暴露服务的节点；控制台中显示为“节点” | 使用控制台生成的系统安装命令 |
 
-控制台将 Client 显示为“节点（Node）”。当前版本不提供独立的 Server 运行程序；启动 Master 时会同时启动内置 Server，不需要部署第二个容器。
-
-## 部署文件
-
-建议为部署保留一个独立目录：
+一个 Master 管理全部 Server 和 Client。每个 Client 可以在控制台中分配一个或多个 Server 链路；每条链路都由 Master 下发独立的 FRPC 配置。
 
 ```text
-frp-panel/
-├── compose.yaml
-└── .env
+                         ┌── Server A / FRPS ── 公网入口与 remote ports
+浏览器 ── Master ────────┼── Server B / FRPS ── 公网入口与 remote ports
+          控制面         └── Server ...
+             │
+             └──────────── Client A/B/... / Agent + FRPC
+                              └── 链路由 Master 后台分配
 ```
+
+推荐按 **Master → Server → Client → 分配链路** 的顺序部署。
+
+## 2. 部署唯一的 Master
+
+为 Master 保留一个目录，其中只有 `compose.yaml` 和 `.env`。仓库根目录提供的 [compose.yaml](https://github.com/Onicc/frp-panel/blob/main/compose.yaml) 与下方内容一致。
 
 ### compose.yaml
 
-以下是可直接保存的完整文件。TCP/UDP 代理使用的 remote port 需要额外添加到 `ports`。
-
 ```yaml
 services:
-  controller:
+  master:
     image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:edge}
     restart: unless-stopped
     environment:
@@ -36,14 +39,10 @@ services:
       MASTER_API_HOST: ${PUBLIC_HOST:?set the public controller hostname}
       MASTER_API_SCHEME: ${MASTER_API_SCHEME:-https}
       MASTER_RPC_HOST: ${PUBLIC_HOST:?set the public controller hostname}
-      CLIENT_API_URL: ${CLIENT_API_URL:?set the public API URL used by Agents}
-      CLIENT_RPC_URL: ${CLIENT_RPC_URL:?set the public RPC URL used by Agents}
+      CLIENT_API_URL: ${CLIENT_API_URL:?set the public API URL used by managed components}
+      CLIENT_RPC_URL: ${CLIENT_RPC_URL:?set the public RPC URL used by managed components}
     ports:
       - "127.0.0.1:9000:9000"
-      - "7000:7000"
-      # Publish every TCP/UDP remote port used by a proxy, for example:
-      # - "10000-10100:10000-10100/tcp"
-      # - "10000-10100:10000-10100/udp"
     volumes:
       - frp-panel-data:/data
     healthcheck:
@@ -58,12 +57,10 @@ volumes:
 
 ### .env
 
-生产环境示例：
-
 ```dotenv
 FRP_PANEL_IMAGE=onicc/frp-panel:edge
 
-APP_GLOBAL_SECRET=REPLACE_ME
+APP_GLOBAL_SECRET=REPLACE_WITH_A_RANDOM_32_BYTE_OR_LONGER_SECRET
 APP_COOKIE_SECURE=true
 APP_ENABLE_REGISTER=true
 
@@ -73,66 +70,141 @@ CLIENT_API_URL=https://panel.example.com
 CLIENT_RPC_URL=wss://panel.example.com
 ```
 
-配置要点：
+配置要求：
 
-- `APP_GLOBAL_SECRET` 必须替换为至少 32 字节的随机值，并长期安全保存。
-- `APP_ENABLE_REGISTER` 仅在创建首个 Owner 时设为 `true`；创建完成后改为 `false` 并重新应用 Compose 配置。
-- `PUBLIC_HOST` 只填写域名，不包含协议或路径。
-- `CLIENT_API_URL` 和 `CLIENT_RPC_URL` 会直接进入前端生成的 Client 安装命令，必须是节点实际可访问的公网地址。
-- 生产环境推荐使用同域名的 `https://` 与 `wss://`，不要使用 `localhost`、容器名、`http://` 或 `ws://`。
-- `edge` 随 `main` 更新；稳定环境建议固定到经过验证的 `v*` 镜像标签。
-- `.env` 包含密钥，文件权限应限制为仅部署管理员可读。
+- `APP_GLOBAL_SECRET` 必须是唯一的高强度随机值，至少 32 字节；需要长期保存，丢失或变更会使现有凭据失效。
+- `APP_ENABLE_REGISTER` 只在创建首个 Owner 时设为 `true`，创建后立即改为 `false` 并重新应用 Compose 配置。
+- `PUBLIC_HOST` 只填写域名或公网 IP，不包含协议、端口和路径。
+- `CLIENT_API_URL`、`CLIENT_RPC_URL` 是 Server 和 Client 实际访问 Master 的公网地址，也会进入控制台生成的部署内容。
+- 使用 `APP_COOKIE_SECURE=true` 时，浏览器入口必须是 HTTPS；推荐让同机反向代理转发至 `127.0.0.1:9000`，并支持 WebSocket。
+- `edge` 会随 `main` 更新；生产环境应固定到已验证的 `v*` 镜像标签。
 
-更多可选项见 [配置说明](/configuration)。
+Master 只需开放 Web/API/RPC 入口，不应映射 `7000` 或任何业务 remote port。
 
-## 网络与反向代理
+## 3. 部署一个或多个 Server（FRPS）
 
-推荐由同机 HTTPS 反向代理接收公网请求，并转发到 `127.0.0.1:9000`。该入口同时承载 Web、API 和 `wss` Agent RPC。
+每个 FRPS 都是独立数据面，部署在真正接收公网流量的 Linux 服务器上：
 
-| 端口 | 用途 | 暴露建议 |
+1. 登录 Master，打开 **服务端 → 创建服务端**。
+2. 填写唯一 ID、该机器供 FRPC 连接的公网域名/IP，以及 FRPS 绑定端口（默认 `7000`）。
+3. 创建后，弹出页会关闭，页面上方会显示该 Server 专属的完整 `compose.yaml`。
+4. 将文件保存到目标 Server 主机并应用。Server 首次启动会兑换一次性令牌，并把长期凭据写入 Docker 数据卷 `/data/server.yaml`。
+5. 返回服务端列表，状态变为“在线”即完成。重复以上步骤即可增加更多 FRPS。
+
+令牌有效期为 10 分钟且只能使用一次。超时或在数据卷创建前丢失部署结果时，使用相同 ID 重新创建即可替换尚未注册的记录。不要在多台机器上复用同一份生成文件或同一个数据卷。
+
+控制台生成文件的结构如下；占位值会在创建时替换为真实内容：
+
+```yaml
+services:
+  frps:
+    image: onicc/frp-panel:edge
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - server
+      - --config
+      - /data/server.yaml
+      - --enrollment-token
+      - "ONE_TIME_TOKEN_FROM_MASTER"
+      - --api-url
+      - "https://panel.example.com"
+      - --rpc-url
+      - "wss://panel.example.com"
+    volumes:
+      - frp-panel-server-data:/data
+
+volumes:
+  frp-panel-server-data:
+```
+
+这里使用 Linux 的 host network，使 FRPS 后续新增任意 TCP/UDP remote port 时不必反复修改容器端口映射。必须在 Server 主机防火墙和云安全组中放行：
+
+- FRPS 绑定端口，例如 `7000/tcp`，供各 Client 连接；
+- 每条隧道实际使用的 TCP/UDP remote port，供业务访问；
+- Server 到 Master 的 HTTPS/WSS 出站访问。
+
+容器内部的 `127.0.0.1:8999` 仅供 FRPS 鉴权插件使用，不应对外开放。
+
+如需手工维护而不是使用控制台生成文件，可使用以下等价模板。
+
+### compose.yaml
+
+```yaml
+services:
+  frps:
+    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:edge}
+    restart: unless-stopped
+    network_mode: host
+    command: ["server", "--config", "/data/server.yaml"]
+    environment:
+      SERVER_ENROLLMENT_TOKEN: ${SERVER_ENROLLMENT_TOKEN:-}
+      CLIENT_API_URL: ${CLIENT_API_URL:?set the Master API URL}
+      CLIENT_RPC_URL: ${CLIENT_RPC_URL:?set the Master RPC URL}
+    volumes:
+      - frp-panel-server-data:/data
+
+volumes:
+  frp-panel-server-data:
+```
+
+### .env
+
+```dotenv
+FRP_PANEL_IMAGE=onicc/frp-panel:edge
+SERVER_ENROLLMENT_TOKEN=ONE_TIME_TOKEN_FROM_MASTER
+CLIENT_API_URL=https://panel.example.com
+CLIENT_RPC_URL=wss://panel.example.com
+```
+
+首次注册成功后可从 `.env` 删除 `SERVER_ENROLLMENT_TOKEN`；重启会直接读取数据卷中的受保护凭据。
+
+## 4. 安装一个或多个 Client（FRPC）
+
+Client 不使用手写 Compose 或手工拼接参数：
+
+1. 在 Master 打开 **节点 → 添加节点**，输入唯一节点 ID。
+2. 选择 Linux、macOS 或 Windows，复制控制台生成的完整安装命令。
+3. 在目标节点以管理员权限执行。脚本会安装二进制、写入受保护配置并注册系统服务，不会使用当前命令目录作为安装位置。
+4. 返回节点列表，状态变为“在线”即完成。每个 Client 都必须使用自己生成的命令。
+
+默认安装位置：
+
+| 系统 | 二进制 | 配置与数据 |
 |---|---|---|
-| `443/tcp` | HTTPS、WebSocket RPC | 对外开放 |
-| `9000/tcp` | Master Web/API | 仅供反向代理访问 |
-| `7000/tcp` | 内置 FRPS | 使用默认 Server 时对 Client 开放 |
-| remote port | TCP/UDP 代理流量 | 按业务需要在 Compose 和防火墙中同时开放 |
-| `9001/tcp` | 原生 gRPC RPC | 使用推荐的 WSS 入口时无需发布 |
-| `8999/tcp` | 内置 Server API | 不对外发布 |
+| Linux | `/usr/local/libexec/frp-panel/frp-panel-agent` | `/etc/frp-panel/agent.yaml`、`/var/lib/frp-panel` |
+| macOS | `/usr/local/libexec/frp-panel/frp-panel-agent` | `/Library/Application Support/frp-panel` |
+| Windows | `%ProgramFiles%\frp-panel\frp-panel-agent.exe` | `%ProgramData%\frp-panel` |
 
-面板域名需要正确解析到反向代理，并且 Master 容器自身也应能够访问 `CLIENT_API_URL` 和 `CLIENT_RPC_URL`。
+注册令牌同样只在 10 分钟内有效并只能兑换一次。详细的服务管理、升级和卸载说明见 [Client / Agent 安装与维护](/agent)。
 
-如果反向代理不在 Docker 主机上，需要调整 `compose.yaml` 中 `127.0.0.1:9000:9000` 的绑定地址，并通过防火墙限制来源。
+## 5. 在后台分配 FRPC 链路
 
-## Server 配置
+Client 上线后默认不连接任何 FRPS，必须由 Master 指定链路：
 
-Master 启动后会自动创建并运行 `default` Server。登录控制台后，可在 **Server** 页面确认其在线状态和配置。
+1. 打开 **节点**，在目标节点的 **FRPS 链路** 列选择一个 Server 并添加。
+2. 可继续添加其他 Server，让同一个物理 Agent 同时运行多条独立 FRPC 链路。
+3. 不再需要的链路可在同一位置移除；在线节点会立即应用变更，离线期间的变更最迟在下一次配置同步时生效。
 
-Docker 只转发 `compose.yaml` 中明确发布的端口。创建 TCP 或 UDP 代理前，必须将对应 remote port 添加到 `ports`；否则控制台配置虽然存在，公网流量仍无法进入容器。
+Master 保存的是“节点 + Server”的明确映射，因此不同 Client 可以选择不同 FRPS，同一个 Client 也可以连接多个 FRPS。隧道配置必须引用目标节点和目标 Server；业务流量不会经过 Master。
 
-当前版本不支持部署独立的远程 Server。在 Server 页面新增记录不会自动在另一台机器上安装或启动 FRPS。
+## 6. 网络端口
 
-## Client 安装
+| 位置 | 端口 | 用途 | 建议 |
+|---|---|---|---|
+| Master | `443/tcp` | Web、API、WSS RPC | 对浏览器、Server、Client 开放 |
+| Master | `9000/tcp` | 容器内 Web/API | 仅反向代理访问 |
+| Master | `9001/tcp` | 原生 gRPC | 使用 WSS 时不发布 |
+| 每台 Server | `7000/tcp` 或自定义值 | FRPC 连接入口 | 对 Client 开放 |
+| 每台 Server | remote ports | 隧道业务入口 | 按业务逐项开放 TCP/UDP |
+| 每台 Server | `8999/tcp` | 本地鉴权 API | 仅回环地址，不开放 |
 
-Client 必须使用控制台生成的命令安装：
+## 7. 验收与备份
 
-1. 登录 Master，打开 **节点（Nodes）→ 添加节点**。
-2. 输入节点 ID 并创建注册信息。
-3. 选择目标系统：Linux、macOS 或 Windows。
-4. 复制页面显示的完整安装命令，在目标节点上以管理员权限执行。
-5. 返回节点列表，确认节点在线。
+- Master 健康检查地址 `/api/v2/health` 可访问，且公开注册已经关闭。
+- 所有 FRPS 在服务端列表显示在线；Server 主机只开放计划内的绑定端口和 remote ports。
+- 所有 Agent 在节点列表显示在线，并能看到正确的 FRPS 链路。
+- 已分别备份 Master 的 `frp-panel-data` 卷、每台 Server 的 `frp-panel-server-data` 卷以及 Master 的 `.env`。
+- 恢复时保持原 `APP_GLOBAL_SECRET` 和数据卷；不要让两台 FRPS 同时使用同一个 Server 数据卷副本。
 
-注册令牌仅在 10 分钟内有效，成功使用一次后立即失效。不要保存或分享包含令牌的安装命令。
-
-如果命令中的域名或协议不正确，应先修正 `.env` 中的 `CLIENT_API_URL`、`CLIENT_RPC_URL`，重新应用 Master 配置，然后生成新的安装命令。
-
-安装路径、服务管理、升级和卸载说明见 [Client / Agent 安装与维护](/agent)。
-
-## 部署验收
-
-- `https://panel.example.com/api/v2/health` 可正常访问。
-- 首个 Owner 创建后，公开注册已关闭。
-- 控制台中的 `default` Server 显示在线。
-- Client 使用前端命令安装后显示在线。
-- FRPS `7000` 和实际使用的 remote port 已在 Compose、防火墙和云安全组中放行。
-- 已备份 `.env` 和 `frp-panel-data` 数据卷；升级或移除服务时不删除该数据卷。
-
-上线前请同时检查 [安全基线](/SECURITY) 和 [平台支持矩阵](/SUPPORT_MATRIX)。
+上线前同时检查 [安全基线](/SECURITY)、[配置说明](/configuration) 和 [平台支持矩阵](/SUPPORT_MATRIX)。
