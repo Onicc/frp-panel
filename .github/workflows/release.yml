@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 
 jobs:
   verify:
@@ -103,10 +103,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete edge --yes || true
-          git tag --force edge
-          git push origin refs/tags/edge --force
-          gh release create edge dist/upload/* --prerelease --title "edge" --notes "Automated build from main at $GITHUB_SHA"
+          gh release delete edge --yes --cleanup-tag || true
+          gh release create edge --target "$GITHUB_SHA" dist/upload/* \
+            --prerelease --title "edge" --notes "Automated build from main at $GITHUB_SHA"
 
   images:
     needs: verify
