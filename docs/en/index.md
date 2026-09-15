@@ -7,11 +7,11 @@ hero:
   tagline: Linux controller with Linux, macOS, and Windows node Agents
   actions:
     - theme: brand
+      text: Deployment guide
+      link: /en/deployment
+    - theme: alt
       text: Quick start
       link: /en/quick-start
-    - theme: alt
-      text: Source code
-      link: https://github.com/Onicc/frp-panel
 
 features:
   - title: Native system layout

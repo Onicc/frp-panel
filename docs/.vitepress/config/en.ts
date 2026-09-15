@@ -7,11 +7,13 @@ export const enConfig: LocaleSpecificConfig<DefaultTheme.Config> = {
   themeConfig: {
     nav: [
       { text: "Home", link: "/en/" },
+      { text: "Deployment", link: "/en/deployment" },
       { text: "Source", link: "https://github.com/Onicc/frp-panel" },
     ],
     sidebar: [
       { text: "Quick start", link: "/en/quick-start" },
-      { text: "Install the Agent", link: "/en/agent" },
+      { text: "Deployment", link: "/en/deployment" },
+      { text: "Client / Agent", link: "/en/agent" },
       { text: "Configuration", link: "/en/configuration" },
       { text: "Architecture", link: "/ARCHITECTURE_V2" },
       { text: "Optimization review", link: "/OPTIMIZATION" },

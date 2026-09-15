@@ -7,11 +7,13 @@ export const zhConfig: LocaleSpecificConfig<DefaultTheme.Config> = {
   themeConfig: {
     nav: [
       { text: "首页", link: "/" },
+      { text: "部署", link: "/deployment" },
       { text: "源码", link: "https://github.com/Onicc/frp-panel" },
     ],
     sidebar: [
       { text: "快速开始", link: "/quick-start" },
-      { text: "安装 Agent", link: "/agent" },
+      { text: "部署指南", link: "/deployment" },
+      { text: "Client / Agent", link: "/agent" },
       { text: "配置", link: "/configuration" },
       { text: "架构", link: "/ARCHITECTURE_V2" },
       { text: "优化审查", link: "/OPTIMIZATION" },

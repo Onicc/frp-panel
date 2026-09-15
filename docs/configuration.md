@@ -13,7 +13,11 @@
 | `MASTER_API_PORT` | `9000` | Web/API 监听端口 |
 | `MASTER_RPC_HOST` | `127.0.0.1` | Agent 可访问的公开 RPC 主机名 |
 | `MASTER_RPC_PORT` | `9001` | Agent RPC 监听端口 |
+| `CLIENT_API_URL` | 自动组合 | 前端安装命令使用的完整公开 API URL，例如 `https://panel.example.com` |
+| `CLIENT_RPC_URL` | 自动组合 | 前端安装命令使用的完整公开 RPC URL，推荐 `wss://panel.example.com` |
 | `DB_TYPE` | `sqlite3` | `sqlite3` 或 `postgres` |
 | `DB_DSN` | `/data/data.db?...` | SQLite 文件或 PostgreSQL DSN |
 
-不要把 `.env`、数据库文件、注册令牌或 Agent 配置提交到版本库。生产入口应设置 HTTPS、请求大小限制和可信代理规则。
+`compose.yaml` 要求显式填写两个 `CLIENT_*_URL`，防止前端生成指向容器内部地址或错误端口的安装命令。使用推荐的同源 HTTPS/WSS 入口时，不需要对外发布 `MASTER_RPC_PORT`。
+
+不要把 `.env`、数据库文件、注册令牌或 Agent 配置提交到版本库。生产入口应设置 HTTPS、请求大小限制和可信代理规则。完整示例见 [部署指南](/deployment)。

@@ -14,22 +14,43 @@
 - 发布 `onicc/frp-panel` 与 `onicc/frp-panel-agent` 两个多架构镜像。
 - 发布物包含 SHA-256、SBOM、GitHub provenance，Actions 均固定到提交 SHA。
 
-## 运行控制器
+## 部署 Master、Server 与 Client
 
-先生成随机密钥：
+Master 提供控制面，默认 Server（FRPS）内置在同一个控制器容器中；Client 是安装到节点上的 `frp-panel-agent` 与受管 FRPC。先为 Docker Compose 创建 `.env`：
 
 ```bash
-export APP_GLOBAL_SECRET="$(openssl rand -hex 32)"
-export PUBLIC_HOST="panel.example.com"
-export APP_ENABLE_REGISTER=true
+openssl rand -hex 32
+```
+
+```dotenv
+APP_GLOBAL_SECRET=REPLACE_ME
+APP_COOKIE_SECURE=true
+APP_ENABLE_REGISTER=true
+PUBLIC_HOST=panel.example.com
+MASTER_API_SCHEME=https
+CLIENT_API_URL=https://panel.example.com
+CLIENT_RPC_URL=wss://panel.example.com
+```
+
+把 `REPLACE_ME` 替换为上一步生成的随机值。
+
+将 HTTPS 反向代理指向 `127.0.0.1:9000`，然后启动：
+
+```bash
+docker compose config --quiet
+docker compose pull
 docker compose up -d
 ```
 
-在 Web 控制台创建初始 Owner 后，将 `APP_ENABLE_REGISTER=false` 并再次执行 `docker compose up -d`。Web/API 端口为 `9000`，Agent RPC 为 `9001`，内置默认 FRPS 为 `7000`。生产环境应在 Web 入口前配置 HTTPS，并保持 `APP_COOKIE_SECURE=true`。
+创建初始 Owner 后立即将 `APP_ENABLE_REGISTER=false` 并重新应用 Compose。内置 FRPS 默认使用 `7000`；各代理使用的 remote port 也必须显式映射。
 
-## 安装 Agent
+Client 必须使用前端 **节点 → 添加节点** 中生成的 10 分钟一次性命令安装。控制台提供 Linux、macOS 和 Windows 命令，并自动带入公开 API/RPC 地址。
 
-在 **节点 → 添加节点** 中生成 10 分钟有效的注册命令，选择对应系统后复制。安装位置如下：
+完整的反向代理、端口、备份、升级和 Client 验证步骤见 [部署指南](docs/deployment.md)。
+
+## Client 安装位置
+
+前端命令的安装位置如下：
 
 | 系统 | 程序 | 配置与数据 |
 |---|---|---|
@@ -37,7 +58,7 @@ docker compose up -d
 | macOS | `/usr/local/libexec/frp-panel/frp-panel-agent` | `/Library/Application Support/frp-panel` |
 | Windows | `%ProgramFiles%\frp-panel\frp-panel-agent.exe` | `%ProgramData%\frp-panel` |
 
-系统服务名为 `frp-panel-agent`。可使用 `service status/restart/uninstall --purge` 管理服务，使用 `doctor --json` 检查能力与配置。
+系统服务名为 `frp-panel-agent`。程序不会自动加入 `PATH`；请使用上表中的完整路径或系统服务管理器维护它。
 
 ## 开发与测试
 

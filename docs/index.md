@@ -7,11 +7,11 @@ hero:
   tagline: Linux 控制器，Linux、macOS 与 Windows 节点 Agent
   actions:
     - theme: brand
+      text: 部署指南
+      link: /deployment
+    - theme: alt
       text: 快速开始
       link: /quick-start
-    - theme: alt
-      text: 查看源码
-      link: https://github.com/Onicc/frp-panel
 
 features:
   - title: 安装到规范目录

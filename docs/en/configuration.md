@@ -13,7 +13,11 @@ Primary environment variables:
 | `MASTER_API_PORT` | `9000` | Web/API listen port |
 | `MASTER_RPC_HOST` | `127.0.0.1` | Public RPC hostname reachable by Agents |
 | `MASTER_RPC_PORT` | `9001` | Agent RPC listen port |
+| `CLIENT_API_URL` | derived | Complete public API URL used in console-generated install commands, for example `https://panel.example.com` |
+| `CLIENT_RPC_URL` | derived | Complete public RPC URL used in console-generated install commands; `wss://panel.example.com` is recommended |
 | `DB_TYPE` | `sqlite3` | `sqlite3` or `postgres` |
 | `DB_DSN` | `/data/data.db?...` | SQLite file or PostgreSQL DSN |
 
-Never commit `.env`, database files, enrollment tokens, or Agent configuration. Production ingress should enforce HTTPS, request-size limits, and trusted-proxy rules.
+`compose.yaml` requires both `CLIENT_*_URL` values explicitly so the console cannot generate an installation command that points at an internal container address or the wrong port. The recommended same-origin HTTPS/WSS entry does not require publishing `MASTER_RPC_PORT`.
+
+Never commit `.env`, database files, enrollment tokens, or Agent configuration. Production ingress should enforce HTTPS, request-size limits, and trusted-proxy rules. See the complete [deployment guide](/en/deployment).
