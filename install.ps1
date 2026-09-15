@@ -1,46 +1,50 @@
-# Download latest release from github
-if($PSVersionTable.PSVersion.Major -lt 5){
-    Write-Host "Require PS >= 5,your PSVersion:"$PSVersionTable.PSVersion.Major -BackgroundColor DarkGreen -ForegroundColor White
-    exit
+#Requires -Version 5.1
+[CmdletBinding()]
+param(
+    [string]$Version = "edge",
+    [string]$GitHubProxy = "",
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$AgentArguments
+)
+
+$ErrorActionPreference = "Stop"
+$repository = "Onicc/frp-panel"
+$architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
+switch ($architecture) {
+    "x64" { $assetArchitecture = "amd64" }
+    "arm64" { $assetArchitecture = "arm64" }
+    default { throw "Unsupported Windows architecture: $architecture" }
 }
-$clientrepo = "VaalaCat/frp-panel"
-#  x86 or x64
-if ([System.Environment]::Is64BitOperatingSystem) {
-    if ([System.Environment]::Is64BitProcess) {
-        $file = "frp-panel-windows-amd64.exe"
-    } else {
-        $file = "frp-panel-windows-arm64.exe"
-    }
+
+$asset = "frp-panel-agent-windows-$assetArchitecture.exe"
+if ($Version -eq "latest") {
+    $releaseUrl = "https://github.com/$repository/releases/latest/download"
 } else {
-    Write-Host "Your system is 32-bit, please use 64-bit operating system" -BackgroundColor DarkGreen -ForegroundColor White
-    exit
+    $releaseUrl = "https://github.com/$repository/releases/download/$Version"
+}
+if ($GitHubProxy) {
+    $releaseUrl = $GitHubProxy.TrimEnd('/') + "/" + $releaseUrl
 }
 
-#重复运行自动更新
-if (Test-Path "C:\frpp\frpp.exe") {
-    Write-Host "frp panel client already exists, delete and reinstall" -BackgroundColor DarkGreen -ForegroundColor White
-    C:/frpp/frpp.exe stop
-    C:/frpp/frpp.exe uninstall
-    Start-Sleep -Seconds 3
-    Remove-Item "C:\frpp\frpp.exe" -Recurse
+$tempDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("frp-panel-" + [Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $tempDirectory | Out-Null
+try {
+    $binary = Join-Path $tempDirectory $asset
+    $checksum = Join-Path $tempDirectory "checksums.txt"
+    Invoke-WebRequest -UseBasicParsing -Uri "$releaseUrl/$asset" -OutFile $binary
+    Invoke-WebRequest -UseBasicParsing -Uri "$releaseUrl/checksums.txt" -OutFile $checksum
+    $checksumLine = Get-Content $checksum | Where-Object { $_ -match "\s+$([Regex]::Escape($asset))$" } | Select-Object -First 1
+    if (-not $checksumLine) { throw "Asset is missing from checksums.txt" }
+    $expected = (($checksumLine.Trim()) -split '\s+')[0].ToLowerInvariant()
+    $actual = (Get-FileHash -Algorithm SHA256 -Path $binary).Hash.ToLowerInvariant()
+    if ($actual -ne $expected) {
+        throw "Checksum verification failed"
+    }
+    & $binary service install @AgentArguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Agent service installation failed with exit code $LASTEXITCODE"
+    }
+    Write-Host "frp-panel-agent installed successfully; no files were written to $((Get-Location).Path)."
+} finally {
+    Remove-Item -LiteralPath $tempDirectory -Recurse -Force -ErrorAction SilentlyContinue
 }
-
-#TLS/SSL
-Write-Host "Check network connection to google" -BackgroundColor DarkGreen -ForegroundColor White
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-$networkAvailable = Test-Connection -ComputerName google.com -Count 1 -ErrorAction SilentlyContinue
-if([string]::IsNullOrEmpty($networkAvailable)){
-    $download = "https://ghfast.top/https://github.com/$clientrepo/releases/latest/download/$file"
-    Write-Host "Location:CN,use mirror address" -BackgroundColor DarkRed -ForegroundColor Green
-}else{
-    $download = "https://github.com/$clientrepo/releases/latest/download/$file"
-    Write-Host "Location: google ok,connect directly!" -BackgroundColor DarkRed -ForegroundColor Green
-}
-echo $download
-Invoke-WebRequest $download -OutFile "C:\frpp.exe"
-New-Item -Path "C:\frpp" -ItemType Directory -ErrorAction SilentlyContinue
-Move-Item -Path "C:\frpp.exe" -Destination "C:\frpp\frpp.exe"
-C:\frpp\frpp.exe install $args
-C:\frpp\frpp.exe start
-Write-Host "Enjoy It!" -BackgroundColor DarkGreen -ForegroundColor Red

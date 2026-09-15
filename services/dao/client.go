@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/models"
+	"github.com/Onicc/frp-panel/models"
+	"github.com/Onicc/frp-panel/utils"
 	"github.com/samber/lo"
 	"gorm.io/gorm"
 )
@@ -54,7 +55,7 @@ func (q *clientQuery) ValidateClientSecret(clientID, clientSecret string) (*mode
 	if err != nil {
 		return nil, err
 	}
-	if c.ConnectSecret != clientSecret {
+	if !utils.CheckCredential(clientSecret, c.ConnectSecret) {
 		return nil, fmt.Errorf("invalid client secret")
 	}
 	return c.ClientEntity, nil

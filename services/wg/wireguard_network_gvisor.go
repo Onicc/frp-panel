@@ -30,7 +30,9 @@ func (w *wireGuard) initGvisorNetwork() error {
 		return errors.New("cannot find stack field in gvisorNet")
 	}
 
-	stackPtrValue := reflect.NewAt(stackField.Type(), unsafe.Pointer(stackField.UnsafeAddr())).Elem()
+	// wireguard-go does not expose this embedded netstack. Keep this narrowly
+	// scoped bridge until the upstream API provides a supported accessor.
+	stackPtrValue := reflect.NewAt(stackField.Type(), unsafe.Pointer(stackField.UnsafeAddr())).Elem() // #nosec G103
 	if !stackPtrValue.IsValid() || stackPtrValue.IsNil() {
 		return errors.New("gvisor stack is nil or invalid")
 	}

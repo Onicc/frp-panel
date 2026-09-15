@@ -1,7 +1,5 @@
 package models
 
-
-
 const (
 	STATUS_UNKNOWN = iota
 	STATUS_NORMAL

@@ -1,55 +1,24 @@
 import type { DefaultTheme, LocaleSpecificConfig } from "vitepress";
 
 export const zhConfig: LocaleSpecificConfig<DefaultTheme.Config> = {
+  lang: "zh-CN",
+  title: "frp-panel v2",
+  description: "安全、跨平台的 FRP 控制面",
   themeConfig: {
     nav: [
       { text: "首页", link: "/" },
-      { text: "源码", link: "https://github.com/vaalacat/frp-panel" },
+      { text: "源码", link: "https://github.com/Onicc/frp-panel" },
     ],
-
     sidebar: [
-      {
-        text: "快速开始",
-        collapsed: false,
-        link: "/quick-start",
-        items: [
-          { text: "Master 部署", link: "/deploy-master" },
-          { text: "Server 部署", link: "/deploy-server" },
-          { text: "Client 部署", link: "/deploy-client" },
-        ],
-      },
-      {
-        text: "进阶使用",
-        collapsed: false,
-        link: "/advanced-usage",
-        items: [
-          { text: "WireGuard 多跳智能组网", link: "/wireguard" },
-        ],
-      },
-      {
-        text: "配置说明",
-        collapsed: false,
-        link: "/all-configs",
-      },
-      {
-        text: "贡献指南",
-        collapsed: false,
-        link: "/contribute",
-      },
-      {
-        text: "常见问题",
-        collapsed: false,
-        link: "/faq",
-      },
-      {
-        text: "截图展示",
-        collapsed: false,
-        link: "/screenshots",
-      },
+      { text: "快速开始", link: "/quick-start" },
+      { text: "安装 Agent", link: "/agent" },
+      { text: "配置", link: "/configuration" },
+      { text: "架构", link: "/ARCHITECTURE_V2" },
+      { text: "优化审查", link: "/OPTIMIZATION" },
+      { text: "平台支持", link: "/SUPPORT_MATRIX" },
+      { text: "安全", link: "/SECURITY" },
+      { text: "API 错误", link: "/api-problems" },
     ],
-
-    socialLinks: [
-      { icon: "github", link: "https://github.com/vaalacat/frp-panel" },
-    ],
+    socialLinks: [{ icon: "github", link: "https://github.com/Onicc/frp-panel" }],
   },
 };

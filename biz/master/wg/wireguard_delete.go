@@ -3,13 +3,13 @@ package wg
 import (
 	"errors"
 
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/models"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/dao"
-	"github.com/VaalaCat/frp-panel/services/rpc"
-	wgsvc "github.com/VaalaCat/frp-panel/services/wg"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/models"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/services/rpc"
+	wgsvc "github.com/Onicc/frp-panel/services/wg"
 )
 
 func DeleteWireGuard(ctx *app.Context, req *pb.DeleteWireGuardRequest) (*pb.DeleteWireGuardResponse, error) {
@@ -108,32 +108,5 @@ func emitDeleteWireGuardEvent(ctx *app.Context, wgToDelete *models.WireGuard) er
 		log.Debugf("update config to client success, client id: [%s], wireguard interface: [%s]", peer.ClientID, peer.Name)
 	}
 
-	return nil
-}
-
-func emitDeleteWireGuardEventToClient(ctx *app.Context, peerNeedRemoveWg *models.WireGuard, wgToDelete *models.WireGuard, adjs map[uint][]wgsvc.Edge) error {
-	log := ctx.Logger().WithField("op", "emitDeleteWireGuardEventToClient")
-	userInfo := common.GetUserInfo(ctx)
-	if !userInfo.Valid() {
-		return errors.New("invalid user")
-	}
-
-	resp := &pb.UpdateWireGuardResponse{}
-
-	err := rpc.CallClientWrapper(ctx, peerNeedRemoveWg.ClientID, pb.Event_EVENT_UPDATE_WIREGUARD, &pb.UpdateWireGuardRequest{
-		WireguardConfig: &pb.WireGuardConfig{
-			InterfaceName: peerNeedRemoveWg.Name,
-			Peers:         []*pb.WireGuardPeerConfig{{ClientId: peerNeedRemoveWg.ClientID}},
-			Adjs:          adjsToPB(adjs),
-		},
-		UpdateType: pb.UpdateWireGuardRequest_UPDATE_TYPE_REMOVE_PEER.Enum(),
-	}, resp)
-	if err != nil {
-		log.WithError(err).Errorf("delete wireguard event send to client error")
-		return err
-	}
-
-	log.Infof("delete wireguard event send to client success, client id: [%s], wireguard interface: [%s]",
-		wgToDelete.ClientID, wgToDelete.Name)
 	return nil
 }

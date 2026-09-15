@@ -3,10 +3,10 @@ package rpc
 import (
 	"time"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils"
 	"google.golang.org/grpc/peer"
 )
 

@@ -4,9 +4,9 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/utils"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/utils"
 )
 
 func WriteWorkerCodeToFile(ctx context.Context, worker *pb.Worker, workerdCWD string) error {
@@ -16,10 +16,11 @@ func WriteWorkerCodeToFile(ctx context.Context, worker *pb.Worker, workerdCWD st
 }
 
 func CodeFilePath(ctx context.Context, worker *pb.Worker, workerdCWD string) string {
+	entry := filepath.Base(filepath.Clean(worker.GetCodeEntry()))
 	return filepath.Join(
 		WorkerCWDPath(ctx, worker, workerdCWD),
 		defs.WorkerCodePath,
-		worker.GetCodeEntry())
+		entry)
 }
 
 func WorkerCodeRootPath(ctx context.Context, worker *pb.Worker, workerdCWD string) string {
@@ -32,7 +33,7 @@ func WorkerCWDPath(ctx context.Context, worker *pb.Worker, workerdCWD string) st
 	return filepath.Join(
 		workerdCWD,
 		defs.WorkerInfoPath,
-		worker.GetWorkerId(),
+		SafeWorkerID(worker.GetWorkerId()),
 	)
 }
 

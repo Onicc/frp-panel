@@ -5,9 +5,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/google/uuid"
 )
 
@@ -21,8 +21,7 @@ import (
 // 	}
 // }
 
-func registClientToMaster(appInstance app.Application, recvStream pb.Master_ServerSendClient, event pb.Event, clientID, clientSecret string) {
-	ctx := context.Background()
+func registClientToMaster(ctx context.Context, appInstance app.Application, recvStream pb.Master_ServerSendClient, event pb.Event, clientID, clientSecret string) {
 	logger.Logger(ctx).Infof("start to regist client to master")
 	for {
 		err := recvStream.Send(&pb.ClientMessage{
@@ -32,8 +31,13 @@ func registClientToMaster(appInstance app.Application, recvStream pb.Master_Serv
 			Secret:    clientSecret,
 		})
 		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			logger.Logger(ctx).WithError(err).Warnf("cannot send, sleep 3s and retry")
-			time.Sleep(3 * time.Second)
+			if !waitForRetry(ctx) {
+				return
+			}
 			continue
 		}
 
@@ -42,7 +46,10 @@ func registClientToMaster(appInstance app.Application, recvStream pb.Master_Serv
 			break
 		}
 		if err != nil {
-			logger.Logger(ctx).Fatalf("cannot receive %v", err)
+			if ctx.Err() == nil {
+				logger.Logger(ctx).WithError(err).Warn("cannot receive registration response")
+			}
+			return
 		}
 
 		if resp.GetEvent() == event {
@@ -52,14 +59,13 @@ func registClientToMaster(appInstance app.Application, recvStream pb.Master_Serv
 	}
 }
 
-func runCLientRpcHandler(appInstance app.Application, recvStream pb.Master_ServerSendClient, done chan bool, clientID string,
+func runClientRPCHandler(ctx context.Context, appInstance app.Application, recvStream pb.Master_ServerSendClient, clientID string,
 	clientHandleServerSend func(appInstance app.Application, req *pb.ServerMessage) *pb.ClientMessage) {
-	c := context.Background()
 	for {
 		select {
-		case <-done:
-			logger.Logger(c).Infof("finish rpc client")
-			recvStream.CloseSend()
+		case <-ctx.Done():
+			logger.Logger(ctx).Infof("finish rpc client")
+			_ = recvStream.CloseSend()
 			return
 		default:
 			resp, err := recvStream.Recv()
@@ -67,8 +73,10 @@ func runCLientRpcHandler(appInstance app.Application, recvStream pb.Master_Serve
 				break
 			}
 			if err != nil {
-				logger.Logger(context.Background()).WithError(err).Errorf("cannot receive, sleep 3s and return")
-				time.Sleep(3 * time.Second)
+				if ctx.Err() == nil {
+					logger.Logger(ctx).WithError(err).Errorf("cannot receive, retrying")
+					_ = waitForRetry(ctx)
+				}
 				return
 			}
 			if resp == nil {
@@ -77,7 +85,7 @@ func runCLientRpcHandler(appInstance app.Application, recvStream pb.Master_Serve
 			go func() {
 				defer func() {
 					if err := recover(); err != nil {
-						logger.Logger(c).Errorf("catch panic, err: %v", err)
+						logger.Logger(ctx).Errorf("catch panic, err: %v", err)
 					}
 				}()
 				msg := clientHandleServerSend(appInstance, resp)
@@ -87,31 +95,46 @@ func runCLientRpcHandler(appInstance app.Application, recvStream pb.Master_Serve
 				msg.ClientId = clientID
 				msg.SessionId = resp.SessionId
 				recvStream.Send(msg)
-				logger.Logger(c).Infof("client resp received: %s", resp.GetClientId())
+				logger.Logger(ctx).Infof("client resp received: %s", resp.GetClientId())
 			}()
 		}
 	}
 }
 
-func startClientRpcHandler(appInstance app.Application, client app.MasterClient, done chan bool, clientID, clientSecret string, event pb.Event,
+func startClientRpcHandler(ctx context.Context, appInstance app.Application, client app.MasterClient, clientID, clientSecret string, event pb.Event,
 	clientHandleServerSend func(appInstance app.Application, req *pb.ServerMessage) *pb.ClientMessage) {
-	c := context.Background()
-	logger.Logger(c).Infof("start to run rpc client")
+	logger.Logger(ctx).Infof("start to run rpc client")
 	for {
 		select {
-		case <-done:
-			logger.Logger(c).Infof("finish rpc client")
+		case <-ctx.Done():
+			logger.Logger(ctx).Infof("finish rpc client")
 			return
 		default:
-			recvStream, err := client.Call().ServerSend(context.Background())
+			recvStream, err := client.Call().ServerSend(ctx)
 			if err != nil {
-				logger.Logger(context.Background()).WithError(err).Errorf("cannot recv, sleep 3s and retry")
-				time.Sleep(3 * time.Second)
+				if ctx.Err() != nil {
+					return
+				}
+				logger.Logger(ctx).WithError(err).Errorf("cannot recv, sleep 3s and retry")
+				if !waitForRetry(ctx) {
+					return
+				}
 				continue
 			}
 
-			registClientToMaster(appInstance, recvStream, event, clientID, clientSecret)
-			runCLientRpcHandler(appInstance, recvStream, done, clientID, clientHandleServerSend)
+			registClientToMaster(ctx, appInstance, recvStream, event, clientID, clientSecret)
+			runClientRPCHandler(ctx, appInstance, recvStream, clientID, clientHandleServerSend)
 		}
+	}
+}
+
+func waitForRetry(ctx context.Context) bool {
+	timer := time.NewTimer(3 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
 }

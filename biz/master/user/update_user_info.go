@@ -2,15 +2,17 @@ package user
 
 import (
 	"context"
+	"net/mail"
+	"strings"
 
-	"github.com/VaalaCat/frp-panel/biz/master/client"
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/models"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/dao"
-	"github.com/VaalaCat/frp-panel/utils"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/biz/master/client"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/models"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
 )
 
 func UpdateUserInfoHander(c *app.Context, req *pb.UpdateUserInfoRequest) (*pb.UpdateUserInfoResponse, error) {
@@ -23,14 +25,26 @@ func UpdateUserInfoHander(c *app.Context, req *pb.UpdateUserInfoRequest) (*pb.Up
 			Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: "invalid user"},
 		}, nil
 	}
-	newUserEntity := userInfo.(*models.UserEntity)
+	current, ok := userInfo.(*models.UserEntity)
+	if !ok {
+		return &pb.UpdateUserInfoResponse{Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: "invalid user"}}, nil
+	}
+	newUserEntity := *current
 	newUserInfo := req.GetUserInfo()
 
 	if newUserInfo.GetEmail() != "" {
-		newUserEntity.Email = newUserInfo.GetEmail()
+		email := strings.TrimSpace(newUserInfo.GetEmail())
+		address, err := mail.ParseAddress(email)
+		if err != nil || address.Address != email {
+			return &pb.UpdateUserInfoResponse{Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: "invalid email"}}, nil
+		}
+		newUserEntity.Email = email
 	}
 
 	if newUserInfo.GetRawPassword() != "" {
+		if len(newUserInfo.GetRawPassword()) < 12 {
+			return &pb.UpdateUserInfoResponse{Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: "password must contain at least 12 characters"}}, nil
+		}
 		hashedPassword, err := utils.HashPassword(newUserInfo.GetRawPassword())
 		if err != nil {
 			logger.Logger(context.Background()).WithError(err).Errorf("cannot hash password")
@@ -40,14 +54,14 @@ func UpdateUserInfoHander(c *app.Context, req *pb.UpdateUserInfoRequest) (*pb.Up
 	}
 
 	if newUserInfo.GetUserName() != "" {
-		newUserEntity.UserName = newUserInfo.GetUserName()
+		username := strings.TrimSpace(newUserInfo.GetUserName())
+		if !utils.IsClientIDPermited(username) {
+			return &pb.UpdateUserInfoResponse{Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: "invalid username"}}, nil
+		}
+		newUserEntity.UserName = username
 	}
 
-	if newUserInfo.GetToken() != "" {
-		newUserEntity.Token = newUserInfo.GetToken()
-	}
-
-	if err := dao.NewMutation(c).UpdateUser(userInfo, newUserEntity); err != nil {
+	if err := dao.NewMutation(c).UpdateUser(userInfo, &newUserEntity); err != nil {
 		return &pb.UpdateUserInfoResponse{
 			Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: err.Error()},
 		}, err

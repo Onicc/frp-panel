@@ -3,9 +3,9 @@ package client
 import (
 	"fmt"
 
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils/logger"
 )
 
 func StopFRPCHandler(ctx *app.Context, req *pb.StopFRPCRequest) (*pb.StopFRPCResponse, error) {
@@ -18,11 +18,13 @@ func StopFRPCHandler(ctx *app.Context, req *pb.StopFRPCRequest) (*pb.StopFRPCRes
 		ctx.GetApp().GetWorkersManager().StopAllWorkers(ctx)
 	}
 
-	errs := ctx.GetApp().GetWireGuardManager().StopAllServices()
-	if len(errs) > 0 {
-		logger.Logger(ctx).
-			WithError(fmt.Errorf("wireguard manager stop all wireguard error, errs: %v", errs)).
-			Errorf("wireguard manager stop all wireguard error")
+	if ctx.GetApp().GetConfig().Client.Features.EnableWireGuard {
+		errs := ctx.GetApp().GetWireGuardManager().StopAllServices()
+		if len(errs) > 0 {
+			logger.Logger(ctx).
+				WithError(fmt.Errorf("wireguard manager stop all wireguard error, errs: %v", errs)).
+				Errorf("wireguard manager stop all wireguard error")
+		}
 	}
 
 	return &pb.StopFRPCResponse{

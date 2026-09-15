@@ -3,7 +3,7 @@ package wg_test
 import (
 	"testing"
 
-	"github.com/VaalaCat/frp-panel/services/wg"
+	"github.com/Onicc/frp-panel/services/wg"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 

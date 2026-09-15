@@ -1,6 +1,6 @@
 package dao
 
-import "github.com/VaalaCat/frp-panel/services/app"
+import "github.com/Onicc/frp-panel/services/app"
 
 type Query interface {
 	CertQuery

@@ -5,8 +5,8 @@ package workerd
 import (
 	"context"
 
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils/logger"
 )
 
 type workerExecManager struct{}

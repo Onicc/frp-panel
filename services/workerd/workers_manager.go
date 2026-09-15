@@ -2,12 +2,11 @@ package workerd
 
 import (
 	"fmt"
-	"runtime"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
 )
 
 type workersManager struct {
@@ -70,57 +69,5 @@ func (m *workersManager) GetWorkerStatus(ctx *app.Context, id string) (defs.Work
 }
 
 func (m *workersManager) InstallWorkerd(ctx *app.Context, url string, installDir string) (string, error) {
-	arch := runtime.GOARCH
-	os := runtime.GOOS
-
-	workerDownloadCfg := ctx.GetApp().GetConfig().Client.Worker.WorkerdDownloadURL
-
-	if os != "linux" {
-		return "", fmt.Errorf("unsupported os: %s", os)
-	}
-	if arch != "amd64" && arch != "arm64" {
-		return "", fmt.Errorf("unsupported arch: %s", arch)
-	}
-
-	downloadUrl := ""
-	if len(url) > 0 {
-		downloadUrl = url
-	} else {
-		switch arch {
-		case "amd64":
-			downloadUrl = workerDownloadCfg.LinuxX8664
-		case "arm64":
-			downloadUrl = workerDownloadCfg.LinuxArm64
-		default:
-			return "", fmt.Errorf("unsupported arch: %s", arch)
-		}
-	}
-
-	if workerDownloadCfg.UseProxy {
-		if len(ctx.GetApp().GetConfig().App.GithubProxyUrl) > 0 {
-			downloadUrl = fmt.Sprintf("%s/%s", ctx.GetApp().GetConfig().App.GithubProxyUrl, downloadUrl)
-		}
-	}
-
-	proxyUrl := ctx.GetApp().GetConfig().HTTP_PROXY
-
-	path, err := utils.DownloadFile(ctx, downloadUrl, proxyUrl)
-	if err != nil {
-		logger.Logger(ctx).WithError(err).Errorf("failed to download workerd, url: %s", downloadUrl)
-		return "", err
-	}
-
-	if len(installDir) == 0 {
-		installDir = "/usr/local/bin"
-	}
-
-	finalPath, err := utils.ExtractGZTo(path, "workerd", installDir)
-	if err != nil {
-		logger.Logger(ctx).WithError(err).Errorf("failed to extract workerd, path: %s", path)
-		return "", err
-	}
-
-	logger.Logger(ctx).Infof("workerd installed successfully, path: %s", finalPath)
-
-	return finalPath, nil
+	return "", fmt.Errorf("automatic workerd installation is disabled; install a verified workerd package and set CLIENT_WORKER_WORKERD_BINARY_PATH")
 }

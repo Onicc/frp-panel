@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"runtime/debug"
 
-	"github.com/VaalaCat/frp-panel/conf"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -20,6 +20,15 @@ func HandleServerMessage(appInstance app.Application, req *pb.ServerMessage) *pb
 	}()
 	c := context.Background()
 	logger.Logger(c).Infof("client get a server message, clientId: [%s], event: [%s], sessionId: [%s]", req.GetClientId(), req.GetEvent().String(), req.GetSessionId())
+	features := appInstance.GetConfig().Client.Features
+	if (isFunctionEvent(req.Event) && !features.EnableFunctions) ||
+		(isWireGuardEvent(req.Event) && !features.EnableWireGuard) ||
+		(req.Event == pb.Event_EVENT_START_PTY_CONNECT && !features.EnableRemoteShell) {
+		return &pb.ClientMessage{
+			Event: pb.Event_EVENT_ERROR, ClientId: req.GetClientId(), SessionId: req.GetSessionId(),
+			Data: []byte("requested capability is disabled on this agent"),
+		}
+	}
 	switch req.Event {
 	case pb.Event_EVENT_UPDATE_FRPC:
 		return app.WrapperServerMsg(appInstance, req, UpdateFrpcHander)
@@ -69,5 +78,26 @@ func HandleServerMessage(appInstance app.Application, req *pb.ServerMessage) *pb
 	return &pb.ClientMessage{
 		Event: pb.Event_EVENT_ERROR,
 		Data:  []byte("unknown event"),
+	}
+}
+
+func isFunctionEvent(event pb.Event) bool {
+	switch event {
+	case pb.Event_EVENT_CREATE_WORKER, pb.Event_EVENT_REMOVE_WORKER,
+		pb.Event_EVENT_GET_WORKER_STATUS, pb.Event_EVENT_INSTALL_WORKERD:
+		return true
+	default:
+		return false
+	}
+}
+
+func isWireGuardEvent(event pb.Event) bool {
+	switch event {
+	case pb.Event_EVENT_CREATE_WIREGUARD, pb.Event_EVENT_DELETE_WIREGUARD,
+		pb.Event_EVENT_UPDATE_WIREGUARD, pb.Event_EVENT_GET_WIREGUARD_RUNTIME_INFO,
+		pb.Event_EVENT_RESTART_WIREGUARD:
+		return true
+	default:
+		return false
 	}
 }

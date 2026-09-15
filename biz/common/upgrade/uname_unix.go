@@ -26,5 +26,3 @@ func bytesToString(ca []byte) string {
 	}
 	return string(b)
 }
-
-

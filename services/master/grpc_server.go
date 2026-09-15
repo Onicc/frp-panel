@@ -6,19 +6,20 @@ import (
 	"io"
 	"net"
 
-	"github.com/VaalaCat/frp-panel/biz/master/client"
-	masterserver "github.com/VaalaCat/frp-panel/biz/master/server"
-	"github.com/VaalaCat/frp-panel/biz/master/shell"
-	"github.com/VaalaCat/frp-panel/biz/master/streamlog"
-	"github.com/VaalaCat/frp-panel/biz/master/wg"
-	"github.com/VaalaCat/frp-panel/biz/master/worker"
-	"github.com/VaalaCat/frp-panel/conf"
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/dao"
-	"github.com/VaalaCat/frp-panel/services/rpc"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/biz/master/client"
+	masterserver "github.com/Onicc/frp-panel/biz/master/server"
+	"github.com/Onicc/frp-panel/biz/master/shell"
+	"github.com/Onicc/frp-panel/biz/master/streamlog"
+	"github.com/Onicc/frp-panel/biz/master/wg"
+	"github.com/Onicc/frp-panel/biz/master/worker"
+	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/services/rpc"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -198,7 +199,11 @@ func (s *server) ServerSend(sender pb.Master_ServerSendServer) error {
 				cliType = defs.CliTypeServer
 			}
 
-			if secret != req.GetSecret() {
+			secretValid := secret == req.GetSecret()
+			if cliType == defs.CliTypeClient {
+				secretValid = utils.CheckCredential(req.GetSecret(), secret)
+			}
+			if !secretValid {
 				logger.Logger(ctx).Errorf("invalid secret, %s id: [%s]", req.GetEvent().String(), req.GetClientId())
 				sender.Send(&pb.ServerMessage{
 					Event: req.GetEvent(),
@@ -220,7 +225,7 @@ func (s *server) ServerSend(sender pb.Master_ServerSendServer) error {
 				ClientId:  req.GetClientId(),
 				SessionId: req.GetClientId(),
 			})
-			logger.Logger(ctx).Infof("register success, req: [%+v]", req)
+			logger.Logger(ctx).Infof("register success, event: [%s], client id: [%s]", req.GetEvent(), req.GetClientId())
 			break
 		}
 	}

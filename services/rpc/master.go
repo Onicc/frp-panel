@@ -3,19 +3,16 @@ package rpc
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net/http"
 
-	"github.com/VaalaCat/frp-panel/conf"
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils"
-	"github.com/VaalaCat/frp-panel/utils/logger"
-	"github.com/VaalaCat/frp-panel/utils/wsgrpc"
+	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/utils/wsgrpc"
 	"github.com/imroc/req/v3"
-	"github.com/samber/lo"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
@@ -83,15 +80,15 @@ func newMasterCli(appInstance app.Application) pb.MasterClient {
 	return pb.NewMasterClient(conn)
 }
 
-func httpCli() *req.Client {
+func httpCli(insecureSkipVerify bool) *req.Client {
 	c := req.C()
-	c.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	c.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: insecureSkipVerify} // #nosec G402 -- explicit opt-in compatibility flag
 	return c
 }
 
 func GetClientCert(appInstance app.Application, clientID, clientSecret string, clientType pb.ClientType) []byte {
 	apiEndpoint := conf.GetAPIURL(appInstance.GetConfig())
-	c := httpCli()
+	c := httpCli(appInstance.GetConfig().Client.TLSInsecureSkipVerify)
 
 	rawReq, err := proto.Marshal(&pb.GetClientCertRequest{
 		ClientId:     clientID,
@@ -113,65 +110,4 @@ func GetClientCert(appInstance app.Application, clientID, clientSecret string, c
 		return nil
 	}
 	return resp.Cert
-}
-
-func InitClient(cfg conf.Config, clientID, joinToken string, ephemeral *bool) (*pb.InitClientResponse, error) {
-	apiEndpoint := conf.GetAPIURL(cfg)
-
-	c := httpCli()
-
-	if ephemeral == nil {
-		ephemeral = lo.ToPtr(true) // default to ephemeral
-	}
-
-	rawReq, err := proto.Marshal(&pb.InitClientRequest{
-		ClientId:  &clientID,
-		Ephemeral: ephemeral,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	r, err := c.R().SetHeader("Content-Type", "application/x-protobuf").
-		SetHeader(defs.AuthorizationKey, joinToken).
-		SetBodyBytes(rawReq).Post(apiEndpoint + "/api/v1/client/init")
-	if err != nil {
-		return nil, err
-	}
-
-	resp := &pb.InitClientResponse{}
-	err = proto.Unmarshal(r.Bytes(), resp)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
-}
-
-func GetClient(cfg conf.Config, clientID, joinToken string) (*pb.GetClientResponse, error) {
-	apiEndpoint := conf.GetAPIURL(cfg)
-	c := httpCli()
-
-	rawReq, err := proto.Marshal(&pb.GetClientRequest{
-		ClientId: &clientID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	r, err := c.R().SetHeader("Content-Type", "application/x-protobuf").
-		SetHeader(defs.AuthorizationKey, joinToken).
-		SetBodyBytes(rawReq).Post(apiEndpoint + "/api/v1/client/get")
-	if err != nil {
-		return nil, err
-	}
-
-	resp := &pb.GetClientResponse{}
-	err = proto.Unmarshal(r.Bytes(), resp)
-	if err != nil {
-		return nil, err
-	}
-	if resp.GetStatus().GetCode() != pb.RespCode_RESP_CODE_SUCCESS {
-		return nil, errors.New(resp.GetStatus().GetMessage())
-	}
-	return resp, nil
 }

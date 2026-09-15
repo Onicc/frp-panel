@@ -6,9 +6,9 @@ import (
 	"html/template"
 	"path/filepath"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/utils"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/utils"
 	"github.com/samber/lo"
 )
 
@@ -62,6 +62,6 @@ func GenWorkerConfig(worker *pb.Worker, dir string) error {
 	return utils.WriteFile(
 		filepath.Join(
 			dir, defs.WorkerInfoPath,
-			worker.GetWorkerId(), defs.CapFileName,
+			SafeWorkerID(worker.GetWorkerId()), defs.CapFileName,
 		), fileContent)
 }

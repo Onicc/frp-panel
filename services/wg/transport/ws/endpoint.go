@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/app"
 	"github.com/gorilla/websocket"
 	"golang.zx2c4.com/wireguard/conn"
 )

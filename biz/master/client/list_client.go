@@ -1,12 +1,12 @@
 package client
 
 import (
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/models"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/dao"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/models"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/samber/lo"
 )
 
@@ -61,7 +61,6 @@ func ListClientsHandler(ctx *app.Context, req *pb.ListClientsRequest) (*pb.ListC
 
 		respCli := &pb.Client{
 			Id:        lo.ToPtr(c.ClientID),
-			Secret:    lo.ToPtr(c.ConnectSecret),
 			Config:    lo.ToPtr(string(c.ConfigContent)),
 			ServerId:  lo.ToPtr(c.ServerID),
 			Stopped:   lo.ToPtr(c.Stopped),

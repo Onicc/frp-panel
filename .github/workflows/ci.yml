@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.17.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: www/pnpm-lock.yaml
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Frontend quality gates
+        working-directory: www
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm exec playwright install --with-deps chromium
+          pnpm test:e2e
+          pnpm audit --prod --audit-level high
+          pnpm build
+      - name: Documentation build
+        working-directory: docs
+        run: pnpm install --frozen-lockfile && pnpm docs:build
+      - name: Go quality gates
+        run: |
+          go test -race ./...
+          go vet ./...
+          go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...
+          go run github.com/securego/gosec/v2/cmd/gosec@v2.29.0 -quiet -exclude-generated -exclude=G104,G115,G204,G301,G302,G304,G122 ./...
+          test -z "$(gofmt -l -- .)"
+      - name: Cross-compile Agent
+        run: |
+          build_dir=$(mktemp -d)
+          trap 'rm -rf "$build_dir"' EXIT
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            suffix=
+            test "${target%/*}" = windows && suffix=.exe
+            GOOS=${target%/*} GOARCH=${target#*/} CGO_ENABLED=0 go build -trimpath -o "$build_dir/agent-${target%/*}-${target#*/}$suffix" ./cmd/frp-panel-agent
+          done
+      - name: Vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - name: Docker build check
+        run: |
+          docker build --target controller -t frp-panel-ci:controller .
+          docker build --target agent -t frp-panel-ci:agent .

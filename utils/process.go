@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"fmt"
+	"math"
 	"os"
 	"strings"
 
@@ -8,7 +10,11 @@ import (
 )
 
 func ProcessExistsBySelf(target string) (bool, error) {
-	selfPID := int32(os.Getpid())
+	pid := os.Getpid()
+	if pid > math.MaxInt32 {
+		return false, fmt.Errorf("process id exceeds int32: %d", pid)
+	}
+	selfPID := int32(pid)
 
 	procs, err := process.Processes()
 	if err != nil {

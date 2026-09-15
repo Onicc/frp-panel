@@ -2,11 +2,12 @@ package workerd
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/utils"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/utils"
 	"github.com/samber/lo"
 )
 
@@ -44,6 +45,10 @@ func FillWorkerValue(worker *pb.Worker, UserID uint, opt ...Opt) {
 }
 
 func SafeWorkerID(id string) string {
-	replacer := strings.NewReplacer("/", "", ".", "", "-", "")
-	return replacer.Replace(id)
+	value := regexp.MustCompile(`[^A-Za-z0-9_]`).ReplaceAllString(id, "_")
+	value = strings.Trim(value, "_")
+	if value == "" {
+		return "worker"
+	}
+	return value
 }

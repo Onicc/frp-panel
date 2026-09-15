@@ -7,14 +7,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/fatedier/frp/client"
 	"github.com/fatedier/frp/client/proxy"
+	"github.com/fatedier/frp/pkg/config/source"
 	v1 "github.com/fatedier/frp/pkg/config/v1"
 	"github.com/fatedier/frp/pkg/config/v1/validation"
-	"github.com/fatedier/frp/pkg/featuregate"
+	"github.com/fatedier/frp/pkg/policy/featuregate"
+	"github.com/fatedier/frp/pkg/policy/security"
 	"github.com/samber/lo"
 	"github.com/sourcegraph/conc"
 )
@@ -39,7 +41,8 @@ func NewClientHandler(commonCfg *v1.ClientCommonConfig,
 		}
 	}
 
-	warning, err := validation.ValidateAllClientConfig(commonCfg, proxyCfgs, visitorCfgs)
+	unsafeFeatures := security.NewUnsafeFeatures(nil)
+	warning, err := validation.ValidateAllClientConfig(commonCfg, proxyCfgs, visitorCfgs, unsafeFeatures)
 	if warning != nil {
 		logger.Logger(ctx).WithError(err).Warnf("validate client config warning: %+v", warning)
 	}
@@ -47,10 +50,14 @@ func NewClientHandler(commonCfg *v1.ClientCommonConfig,
 		logger.Logger(ctx).Panic(err)
 	}
 
+	configSource := source.NewConfigSource()
+	if err := configSource.ReplaceAll(proxyCfgs, visitorCfgs); err != nil {
+		logger.Logger(ctx).Panic(err)
+	}
 	cli, err := client.NewService(client.ServiceOptions{
-		Common:      commonCfg,
-		ProxyCfgs:   proxyCfgs,
-		VisitorCfgs: visitorCfgs,
+		Common:                 commonCfg,
+		ConfigSourceAggregator: source.NewAggregator(configSource),
+		UnsafeFeatures:         unsafeFeatures,
 	})
 	if err != nil {
 		logger.Logger(ctx).Panic(err)

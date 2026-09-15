@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/VaalaCat/frp-panel/biz/master/proxy"
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/models"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/dao"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/biz/master/proxy"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/models"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/utils/logger"
 	v1 "github.com/fatedier/frp/pkg/config/v1"
 )
 

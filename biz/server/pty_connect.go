@@ -1,9 +1,9 @@
 package server
 
 import (
-	"github.com/VaalaCat/frp-panel/biz/common"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/biz/common"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
 )
 
 func StartPTYConnect(c *app.Context, req *pb.CommonRequest) (*pb.CommonResponse, error) {

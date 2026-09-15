@@ -7,6 +7,9 @@ type Options struct {
 
 	// DownloadURL 自定义下载地址（最高优先级）。若非空，则直接下载该 URL
 	DownloadURL string
+	// ExpectedSHA256 is required with a custom download URL. Official releases
+	// are verified against their signed release checksums file.
+	ExpectedSHA256 string
 
 	// GithubProxy GitHub 代理前缀，例如 https://ghfast.top/（仅当 UseGithubProxy=true 且 DownloadURL 为空时生效）
 	GithubProxy string
@@ -35,5 +38,3 @@ type Options struct {
 	// ServiceArgs 透传给 utils.ControlSystemService（参考 cmd/frpp/shared/cmd.go）
 	ServiceArgs []string
 }
-
-

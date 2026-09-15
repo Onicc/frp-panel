@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/VaalaCat/frp-panel/defs"
+	"github.com/Onicc/frp-panel/defs"
 )
 
 func InitAndValidateWGConfig(cfg *defs.WireGuardConfig, logger *logrus.Entry) error {

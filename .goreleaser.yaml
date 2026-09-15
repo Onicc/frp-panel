@@ -1,0 +1,44 @@
+version: 2
+
+builds:
+  - id: controller
+    main: ./cmd/frpp
+    binary: frp-panel
+    env: [CGO_ENABLED=0]
+    goos: [linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/Onicc/frp-panel/conf.gitVersion={{.Version}}
+      - -X github.com/Onicc/frp-panel/conf.gitCommit={{.Commit}}
+      - -X github.com/Onicc/frp-panel/conf.buildDate={{.Date}}
+  - id: agent
+    main: ./cmd/frp-panel-agent
+    binary: frp-panel-agent
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/Onicc/frp-panel/conf.gitVersion={{.Version}}
+      - -X github.com/Onicc/frp-panel/conf.gitCommit={{.Commit}}
+      - -X github.com/Onicc/frp-panel/conf.buildDate={{.Date}}
+
+archives:
+  - id: binaries
+    ids: [controller, agent]
+    formats: [binary]
+    # GoReleaser appends the Windows executable suffix automatically.
+    name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+sboms:
+  - artifacts: binary
+
+changelog:
+  sort: asc
+  filters:
+    exclude: ['^docs:', '^test:', '^chore:']

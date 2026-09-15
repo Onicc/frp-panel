@@ -8,7 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"google.golang.org/grpc/credentials"
 )
 
@@ -55,17 +55,4 @@ func TLSClientCert(caPem []byte) (credentials.TransportCredentials, error) {
 	certpool := x509.NewCertPool()
 	certpool.AppendCertsFromPEM(caPem)
 	return credentials.NewClientTLSFromCert(certpool, ""), nil
-}
-
-func TLSClientCertNoValidate(caPem []byte) (credentials.TransportCredentials, error) {
-	certpool := x509.NewCertPool()
-	certpool.AppendCertsFromPEM(caPem)
-
-	config := &tls.Config{
-		RootCAs:            certpool,
-		InsecureSkipVerify: true,
-		MinVersion:         tls.VersionTLS12,
-	}
-
-	return credentials.NewTLS(config), nil
 }

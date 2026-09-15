@@ -2,23 +2,22 @@
 layout: home
 
 hero:
-  name: "Frp-Panel 文档"
-  text: "多节点、中心化、可视化 的 frp 管理平台"
-  tagline: Cloudflare Tunnel / Tailscale Funnel / Ngork / nps 平台和代理的安全、现代化开源替代品
+  name: "frp-panel v2"
+  text: "安全、跨平台的 FRP 控制面"
+  tagline: Linux 控制器，Linux、macOS 与 Windows 节点 Agent
   actions:
-    - theme: alt
+    - theme: brand
       text: 快速开始
       link: /quick-start
+    - theme: alt
+      text: 查看源码
+      link: https://github.com/Onicc/frp-panel
 
 features:
-  - title: 🚀 一键启动
-    details: 通过 Docker Compose 或单行命令快速部署，支持多种架构 (x86/ARM)，内置批量节点启动命令和自动配置生成功能
-  - title: 📦 一键安装
-    details: 提供全自动安装脚本，自动检测系统依赖，支持 Debian/Ubuntu/CentOS 等主流 Linux 发行版 / Windows10 以上 / MacOS 等
-  - title: 🌐 中心化网页管理
-    details: 可视化仪表盘支持多节点集中管控frpc/frps，实时流量统计，支持 HTTPS/WSS 协议，提供实时日志分析和实时网页交互终端
-  - title: 🔒 企业级安全
-    details: RPC端口默认开启 TLS 加密通信，API 可使用反向代理支持 TLS。RPC 端口和 API 均支持以反向代理支持 TLS
+  - title: 安装到规范目录
+    details: Agent 由 systemd、launchd 或 Windows SCM 管理，不在执行命令的目录留下程序和配置。
+  - title: 安全默认值
+    details: 一次性注册令牌、受保护的凭据文件、Argon2id 密码、同源 WebSocket 与默认 TLS 校验。
+  - title: 可重复发布
+    details: 六种 Agent 架构、双多架构镜像、SHA-256、SBOM、provenance 与固定版本的 CI 动作。
 ---
-
-QQ交流群: `830620423`

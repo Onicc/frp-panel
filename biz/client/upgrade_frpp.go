@@ -3,10 +3,10 @@ package client
 import (
 	"context"
 
-	bizupgrade "github.com/VaalaCat/frp-panel/biz/common/upgrade"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	bizupgrade "github.com/Onicc/frp-panel/biz/common/upgrade"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils/logger"
 )
 
 // UpgradeFrpp 收到 master 下发的升级指令后，异步执行升级并快速 ACK。

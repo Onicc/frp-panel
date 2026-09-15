@@ -6,8 +6,8 @@ import (
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/VaalaCat/frp-panel/models"
-	"github.com/VaalaCat/frp-panel/pb"
+	"github.com/Onicc/frp-panel/models"
+	"github.com/Onicc/frp-panel/pb"
 	"github.com/samber/lo"
 )
 

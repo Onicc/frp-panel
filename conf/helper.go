@@ -2,6 +2,7 @@ package conf
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
@@ -10,9 +11,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/utils"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
 	v1 "github.com/fatedier/frp/pkg/config/v1"
 )
 
@@ -25,7 +26,8 @@ func rpcCallAddr(cfg Config) string {
 }
 
 func JWTSecret(cfg Config) string {
-	return utils.SHA1(fmt.Sprintf("%s:%d:%s", cfg.Master.APIHost, cfg.Master.APIPort, cfg.App.GlobalSecret))
+	hash := sha256.Sum256([]byte("frp-panel:v2:" + cfg.App.GlobalSecret))
+	return fmt.Sprintf("%x", hash[:])
 }
 
 func MasterAPIListenAddr(cfg Config) string {
@@ -59,18 +61,21 @@ func GetJWTWithPayload(cfg Config, uid int, payload map[string]interface{}) (str
 		payload)
 }
 
-func GetJWTWithAllPermission(cfg Config, uid int) string {
-	token, _ := GetJWTWithPayload(cfg, uid, map[string]interface{}{
-		defs.TokenPayloadKey_Permissions: AllPermission(),
-	})
-	return token
-}
-
-func AllPermission() []defs.APIPermission {
-	return []defs.APIPermission{{
-		Method: "*",
-		Path:   "*",
-	}}
+func PermissionsForRole(role string) []defs.APIPermission {
+	permissions := []defs.APIPermission{
+		{Method: "GET", Path: "*"},
+		{Method: "POST", Path: `^/api/v1/(user/(get|update)|platform/clientsstatus|client/(get|list)|server/(get|list)|proxy/(get_by_cid|get_by_sid|list_configs|get_config)|worker/(get|status|list|get_ingress)|wg/.*(get|list|topology))$`},
+	}
+	switch role {
+	case defs.UserRole_Owner, defs.UserRole_Admin:
+		return []defs.APIPermission{{Method: "*", Path: "*"}}
+	case defs.UserRole_Operator:
+		permissions = append(permissions,
+			defs.APIPermission{Method: "POST", Path: `^/api/v1/(client|server|frpc|frps|proxy|wg|worker)(/.*)?$`},
+			defs.APIPermission{Method: "POST", Path: `^/api/v2/enrollments$`},
+		)
+	}
+	return permissions
 }
 
 func GetCommonJWT(cfg Config, uid int) string {

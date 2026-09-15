@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/VaalaCat/frp-panel/pb"
+	"github.com/Onicc/frp-panel/pb"
 )
 
 func ParseWGRunningInfo(raw string) (*pb.WGDeviceRuntimeInfo, error) {

@@ -18,11 +18,22 @@ func buildDownloadURL(opt Options) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	url := fmt.Sprintf("https://github.com/VaalaCat/frp-panel/releases/download/%s/%s", version, asset)
+	var url string
+	if version == "latest" {
+		url = fmt.Sprintf("https://github.com/Onicc/frp-panel/releases/latest/download/%s", asset)
+	} else {
+		url = fmt.Sprintf("https://github.com/Onicc/frp-panel/releases/download/%s/%s", version, asset)
+	}
 	if opt.UseGithubProxy && len(strings.TrimSpace(opt.GithubProxy)) > 0 {
 		url = fmt.Sprintf("%s/%s", strings.TrimRight(strings.TrimSpace(opt.GithubProxy), "/"), url)
 	}
 	return url, nil
 }
 
-
+func buildChecksumURL(downloadURL string) string {
+	index := strings.LastIndex(downloadURL, "/")
+	if index < 0 {
+		return ""
+	}
+	return downloadURL[:index+1] + "checksums.txt"
+}

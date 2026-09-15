@@ -3,9 +3,9 @@ package user
 import (
 	"fmt"
 
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
 	"github.com/samber/lo"
 )
 

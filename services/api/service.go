@@ -1,7 +1,11 @@
 package api
 
 import (
+	"context"
+	"errors"
 	"net"
+	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,7 +16,7 @@ type ApiService interface {
 }
 
 type server struct {
-	srv    *gin.Engine
+	srv    *http.Server
 	addr   net.Listener
 	enable bool
 }
@@ -23,7 +27,7 @@ var (
 
 func NewApiService(listen net.Listener, router *gin.Engine, enable bool) *server {
 	return &server{
-		srv:    router,
+		srv:    &http.Server{Handler: router, ReadHeaderTimeout: 30 * time.Second},
 		addr:   listen,
 		enable: enable,
 	}
@@ -34,8 +38,18 @@ func (s *server) Run() {
 	if !s.enable {
 		return
 	}
-	s.srv.RunListener(s.addr)
+	if err := s.srv.Serve(s.addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return
+	}
 }
 
 func (s *server) Stop() {
+	if !s.enable {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := s.srv.Shutdown(ctx); err != nil {
+		_ = s.srv.Close()
+	}
 }

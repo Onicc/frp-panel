@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/utils"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/kardianos/service"
 )
 
@@ -76,6 +76,33 @@ func StartWithResult(ctx context.Context, opt Options) (StartResult, error) {
 	tmpPath, err := utils.DownloadFile(ctx, downloadURL, strings.TrimSpace(opt.HTTPProxy))
 	if err != nil {
 		return StartResult{}, fmt.Errorf("download failed: %w", err)
+	}
+	defer os.RemoveAll(filepath.Dir(tmpPath))
+	expectedChecksum := strings.TrimSpace(opt.ExpectedSHA256)
+	if strings.TrimSpace(opt.DownloadURL) != "" && expectedChecksum == "" {
+		return StartResult{}, fmt.Errorf("expected SHA-256 is required for a custom download URL")
+	}
+	if expectedChecksum == "" {
+		checksumPath, err := utils.DownloadFile(ctx, buildChecksumURL(downloadURL), strings.TrimSpace(opt.HTTPProxy))
+		if err != nil {
+			return StartResult{}, fmt.Errorf("download checksums failed: %w", err)
+		}
+		defer os.RemoveAll(filepath.Dir(checksumPath))
+		content, err := os.ReadFile(checksumPath)
+		if err != nil {
+			return StartResult{}, fmt.Errorf("read checksums failed: %w", err)
+		}
+		asset, err := detectAssetName()
+		if err != nil {
+			return StartResult{}, err
+		}
+		expectedChecksum, err = checksumForAsset(content, asset)
+		if err != nil {
+			return StartResult{}, err
+		}
+	}
+	if err := verifySHA256(tmpPath, expectedChecksum); err != nil {
+		return StartResult{}, fmt.Errorf("verify download: %w", err)
 	}
 
 	// stage 到目标目录附近，避免跨文件系统 rename 问题

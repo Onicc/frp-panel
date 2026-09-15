@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/utils"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"
@@ -19,15 +19,16 @@ import (
 type Config struct {
 	App struct {
 		UseGvisorNet   bool   `env:"USE_GVISOR_NET" env-default:"false" env-description:"use gvisor netstack for TUN device"`
-		GlobalSecret   string `env:"GLOBAL_SECRET" env-default:"frp-panel" env-description:"global secret, used in manager gen secret, keep it safe"`
+		GlobalSecret   string `env:"GLOBAL_SECRET" env-description:"at least 32 random characters; used to derive signing keys"`
 		CookieAge      int    `env:"COOKIE_AGE" env-default:"86400" env-description:"cookie age in second, default is 1 day"`
 		CookieName     string `env:"COOKIE_NAME" env-default:"frp-panel-cookie" env-description:"cookie name"`
 		CookiePath     string `env:"COOKIE_PATH" env-default:"/" env-description:"cookie path"`
 		CookieDomain   string `env:"COOKIE_DOMAIN" env-default:"" env-description:"cookie domain"`
-		CookieSecure   bool   `env:"COOKIE_SECURE" env-default:"false" env-description:"cookie secure"`
+		CookieSecure   bool   `env:"COOKIE_SECURE" env-default:"true" env-description:"cookie secure"`
 		CookieHTTPOnly bool   `env:"COOKIE_HTTP_ONLY" env-default:"true" env-description:"cookie http only"`
+		AllowedOrigins string `env:"ALLOWED_ORIGINS" env-description:"comma-separated browser origins allowed for websocket upgrades"`
 		EnableRegister bool   `env:"ENABLE_REGISTER" env-default:"false" env-description:"enable register, only allow the first admin to register"`
-		GithubProxyUrl string `env:"GITHUB_PROXY_URL" env-default:"https://ghfast.top/" env-description:"github proxy url"`
+		GithubProxyUrl string `env:"GITHUB_PROXY_URL" env-description:"optional explicitly trusted github proxy url"`
 	} `env-prefix:"APP_"`
 	Master struct {
 		APIPort               int    `env:"API_PORT" env-default:"9000" env-description:"master api port"`
@@ -42,8 +43,8 @@ type Config struct {
 		APIPort int `env:"API_PORT" env-default:"8999" env-description:"server api port"`
 	} `env-prefix:"SERVER_"`
 	DB struct {
-		Type string `env:"TYPE" env-default:"sqlite3" env-description:"db type, mysql or sqlite3 and so on"`
-		DSN  string `env:"DSN" env-default:"/data/data.db?_pragma=journal_mode(WAL)" env-description:"db dsn, for sqlite is path, other is dsn, look at https://github.com/go-sql-driver/mysql#dsn-data-source-name"`
+		Type string `env:"TYPE" env-default:"sqlite3" env-description:"database type: sqlite3 or postgres"`
+		DSN  string `env:"DSN" env-default:"/data/data.db?_pragma=journal_mode(WAL)" env-description:"SQLite path or PostgreSQL DSN"`
 	} `env-prefix:"DB_"`
 	Client struct {
 		ID                    string `env:"ID" env-description:"client id"`
@@ -51,19 +52,20 @@ type Config struct {
 		TLSRpc                bool   `env:"TLS_RPC" env-default:"true" env-description:"use tls for rpc connection"`
 		RPCUrl                string `env:"RPC_URL" env-description:"rpc url, support ws or wss or grpc scheme, eg: ws://127.0.0.1:9000"`
 		APIUrl                string `env:"API_URL" env-description:"api url, support http or https scheme, eg: http://127.0.0.1:9000"`
-		TLSInsecureSkipVerify bool   `env:"TLS_INSECURE_SKIP_VERIFY" env-default:"true" env-description:"skip tls verify"`
+		TLSInsecureSkipVerify bool   `env:"TLS_INSECURE_SKIP_VERIFY" env-default:"false" env-description:"skip tls verification (unsafe)"`
 		Worker                struct {
 			WorkerdBinaryPath  string `env:"WORKERD_BINARY_PATH" env-description:"workerd binary path"`
 			WorkerdWorkDir     string `env:"WORKERD_WORK_DIR" env-default:"/tmp/frpp/workerd" env-description:"workerd work dir"`
 			WorkerdDownloadURL struct {
-				UseProxy   bool   `env:"USE_PROXY" env-default:"true" env-description:"use proxy"`
+				UseProxy   bool   `env:"USE_PROXY" env-default:"false" env-description:"use an explicitly configured proxy"`
 				LinuxArm64 string `env:"LINUX_ARM64" env-default:"https://github.com/cloudflare/workerd/releases/download/v1.20250505.0/workerd-linux-arm64.gz"`
 				LinuxX8664 string `env:"LINUX_X86_64" env-default:"https://github.com/cloudflare/workerd/releases/download/v1.20250505.0/workerd-linux-64.gz"`
 			} `env-prefix:"WORKERD_DOWNLOAD_URL_" env-description:"workerd download url"`
 		} `env-prefix:"WORKER_" env-description:"worker's config"`
 		Features struct {
-			EnableFunctions   bool `env:"ENABLE_FUNCTIONS" env-default:"true" env-description:"enable functions"`
-			EnableRemoteShell bool `env:"ENABLE_REMOTE_SHELL" env-default:"true" env-description:"enable remote shell"`
+			EnableFunctions   bool `env:"ENABLE_FUNCTIONS" env-default:"false" env-description:"enable functions"`
+			EnableRemoteShell bool `env:"ENABLE_REMOTE_SHELL" env-default:"false" env-description:"enable remote shell"`
+			EnableWireGuard   bool `env:"ENABLE_WIREGUARD" env-default:"false" env-description:"enable WireGuard"`
 		} `env-prefix:"FEATURES_" env-description:"features config"`
 	} `env-prefix:"CLIENT_"`
 	IsDebug bool `env:"IS_DEBUG" env-default:"false" env-description:"is debug mode"`
@@ -102,7 +104,7 @@ func NewConfig() Config {
 		logger.Logger(ctx).Info("use runtime env variables")
 	}
 
-	cfg := Config{}
+	cfg := DefaultConfig()
 	if err = cleanenv.ReadEnv(&cfg); err != nil {
 		logger.Logger(ctx).Panic(err)
 	}
@@ -112,6 +114,31 @@ func NewConfig() Config {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	return cfg
+}
+
+// DefaultConfig provides the same safe defaults without reading process
+// environment or files. The Agent uses it so controller-side .env files cannot
+// leak into a node runtime started from an arbitrary working directory.
+func DefaultConfig() Config {
+	var cfg Config
+	cfg.App.CookieAge = 86400
+	cfg.App.CookieName = "frp-panel-cookie"
+	cfg.App.CookiePath = "/"
+	cfg.App.CookieSecure = true
+	cfg.App.CookieHTTPOnly = true
+	cfg.Master.APIPort = 9000
+	cfg.Master.APIScheme = "http"
+	cfg.Master.CacheSize = 10
+	cfg.Master.RPCHost = "127.0.0.1"
+	cfg.Master.RPCPort = 9001
+	cfg.Server.APIPort = 8999
+	cfg.DB.Type = defs.DBTypeSQLite3
+	cfg.DB.DSN = "/data/data.db?_pragma=journal_mode(WAL)"
+	cfg.Client.TLSRpc = true
+	cfg.Client.Worker.WorkerdWorkDir = "/tmp/frp-panel/workerd"
+	cfg.Logger.DefaultLoggerLevel = "info"
+	cfg.Logger.FRPLoggerLevel = "info"
 	return cfg
 }
 
@@ -151,6 +178,17 @@ func (cfg *Config) Complete() {
 }
 
 func (cfg Config) PrintStr() string {
-	raw, _ := json.Marshal(cfg)
+	redacted := cfg
+	redacted.App.GlobalSecret = "[redacted]"
+	redacted.Client.Secret = "[redacted]"
+	redacted.HTTP_PROXY = redactURL(redacted.HTTP_PROXY)
+	raw, _ := json.Marshal(redacted)
 	return string(pretty.Pretty(raw))
+}
+
+func redactURL(value string) string {
+	if value == "" {
+		return ""
+	}
+	return "[redacted]"
 }

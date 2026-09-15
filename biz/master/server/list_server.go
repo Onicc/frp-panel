@@ -1,11 +1,11 @@
 package server
 
 import (
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/models"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/models"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/dao"
 	"github.com/samber/lo"
 )
 
@@ -51,7 +51,6 @@ func ListServersHandler(c *app.Context, req *pb.ListServersRequest) (*pb.ListSer
 			return &pb.Server{
 				Id:       lo.ToPtr(c.ServerID),
 				Config:   lo.ToPtr(string(c.ConfigContent)),
-				Secret:   lo.ToPtr(c.ConnectSecret),
 				Ip:       lo.ToPtr(c.ServerIP),
 				Comment:  lo.ToPtr(c.Comment),
 				FrpsUrls: c.FrpsUrls,

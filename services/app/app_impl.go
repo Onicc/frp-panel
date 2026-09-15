@@ -4,10 +4,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/VaalaCat/frp-panel/conf"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/utils/logger"
-	"github.com/casbin/casbin/v2"
+	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/credentials"
 )
@@ -28,8 +27,6 @@ type application struct {
 	rpcCred              credentials.TransportCredentials
 	conf                 conf.Config
 	currentRole          string
-	permManager          PermissionManager
-	enforcer             *casbin.Enforcer
 	workerExecManager    WorkerExecManager
 	workersManager       WorkersManager
 	wireGuardManager     WireGuardManager
@@ -81,26 +78,6 @@ func (a *application) GetWorkerExecManager() WorkerExecManager {
 // SetWorkerExecManager implements Application.
 func (a *application) SetWorkerExecManager(w WorkerExecManager) {
 	a.workerExecManager = w
-}
-
-// GetEnforcer implements Application.
-func (a *application) GetEnforcer() *casbin.Enforcer {
-	return a.enforcer
-}
-
-// SetEnforcer implements Application.
-func (a *application) SetEnforcer(c *casbin.Enforcer) {
-	a.enforcer = c
-}
-
-// GetPermManager implements Application.
-func (a *application) GetPermManager() PermissionManager {
-	return a.permManager
-}
-
-// SetPermManager implements Application.
-func (a *application) SetPermManager(p PermissionManager) {
-	a.permManager = p
 }
 
 // GetCurrentRole implements Application.

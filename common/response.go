@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -53,7 +53,7 @@ func ErrResp[T RespType](c *gin.Context, origin *T, err string) {
 	if c.ContentType() == "application/x-protobuf" {
 		c.ProtoBuf(http.StatusInternalServerError, origin)
 	} else {
-		c.JSON(http.StatusOK, Err(err).WithBody(origin))
+		c.JSON(http.StatusInternalServerError, Err(err).WithBody(origin))
 	}
 }
 
@@ -63,7 +63,7 @@ func ErrUnAuthorized(c *gin.Context, err string) {
 		c.ProtoBuf(http.StatusUnauthorized,
 			&pb.CommonResponse{Status: &pb.Status{Code: pb.RespCode_RESP_CODE_UNAUTHORIZED, Message: err}})
 	} else {
-		c.JSON(http.StatusOK, Err(err))
+		c.JSON(http.StatusUnauthorized, Err(err))
 	}
 }
 

@@ -1,0 +1,123 @@
+openapi: 3.1.0
+info:
+  title: frp-panel API
+  version: 2.0.0-edge
+  license:
+    name: AGPL-3.0
+    identifier: AGPL-3.0-only
+servers:
+  - url: /api/v2
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Controller is ready.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, time, protocol]
+                properties:
+                  status: { const: ok }
+                  time: { type: string, format: date-time }
+                  protocol: { const: '2' }
+  /capabilities:
+    get:
+      operationId: getCapabilities
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Controller and current-node capabilities.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /enrollments:
+    post:
+      operationId: createAgentEnrollment
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nodeId]
+              properties:
+                nodeId: { type: string, pattern: '^[A-Za-z0-9_-]+$' }
+      responses:
+        '201':
+          description: A one-use enrollment valid for ten minutes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Enrollment' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /agent/enroll:
+    post:
+      operationId: redeemAgentEnrollment
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, minLength: 32, maxLength: 256 }
+      responses:
+        '200':
+          description: Permanent credential returned once and never stored in plaintext.
+          headers:
+            Cache-Control: { schema: { const: no-store } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nodeId, secret]
+                properties:
+                  nodeId: { type: string }
+                  secret: { type: string, writeOnly: true }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: frp-panel-cookie
+  schemas:
+    Enrollment:
+      type: object
+      required: [nodeId, token, expiresAt]
+      properties:
+        nodeId: { type: string }
+        token: { type: string, writeOnly: true }
+        expiresAt: { type: string, format: date-time }
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail: { type: string }
+        instance: { type: string, format: uri-reference }
+  responses:
+    Problem:
+      description: RFC 9457 problem detail.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }

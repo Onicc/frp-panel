@@ -9,32 +9,29 @@ import (
 	"path/filepath"
 	"sync"
 
-	bizcommon "github.com/VaalaCat/frp-panel/biz/common"
-	"github.com/VaalaCat/frp-panel/conf"
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/models"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/api"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/dao"
-	"github.com/VaalaCat/frp-panel/services/master"
-	"github.com/VaalaCat/frp-panel/services/mux"
-	"github.com/VaalaCat/frp-panel/services/rbac"
-	"github.com/VaalaCat/frp-panel/services/rpc"
-	"github.com/VaalaCat/frp-panel/services/watcher"
-	"github.com/VaalaCat/frp-panel/services/wg"
-	"github.com/VaalaCat/frp-panel/services/workerd"
-	"github.com/VaalaCat/frp-panel/utils"
-	"github.com/VaalaCat/frp-panel/utils/logger"
-	"github.com/VaalaCat/frp-panel/utils/wsgrpc"
-	"github.com/casbin/casbin/v2"
+	bizcommon "github.com/Onicc/frp-panel/biz/common"
+	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/models"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/api"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/services/master"
+	"github.com/Onicc/frp-panel/services/mux"
+	"github.com/Onicc/frp-panel/services/rpc"
+	"github.com/Onicc/frp-panel/services/watcher"
+	"github.com/Onicc/frp-panel/services/wg"
+	"github.com/Onicc/frp-panel/services/workerd"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/utils/wsgrpc"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/gorilla/websocket"
 	"go.uber.org/fx"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -67,16 +64,12 @@ func NewBaseApp(param struct {
 	return appInstance
 }
 
-func NewPatchedConfig(param struct {
+func NewRuntimeConfig(param struct {
 	fx.In
 
-	AppInstance app.Application
-	CommonArgs  CommonArgs
+	Cfg conf.Config `name:"originConfig"`
 }) conf.Config {
-	patchedCfg := patchConfig(param.AppInstance, param.CommonArgs)
-	param.AppInstance.SetConfig(patchedCfg)
-
-	return patchedCfg
+	return param.Cfg
 }
 
 func NewContext(appInstance app.Application) *app.Context {
@@ -115,21 +108,14 @@ func NewDBManager(ctx *app.Context, appInstance app.Application) app.DBManager {
 			logger.Logger(ctx).Infof("new data location: [%s]", appInstance.GetConfig().DB.DSN)
 		}
 
-		if sqlitedb, err := gorm.Open(sqlite.Open(appInstance.GetConfig().DB.DSN), &gorm.Config{}); err != nil {
+		if sqlitedb, err := gorm.Open(sqlite.Open(appInstance.GetConfig().DB.DSN), databaseConfig()); err != nil {
 			logger.Logger(ctx).Panic(err)
 		} else {
 			appInstance.GetDBManager().SetDB(defs.DBTypeSQLite3, defs.DBRoleDefault, sqlitedb)
 			logger.Logger(ctx).Infof("init database success, data location: [%s]", appInstance.GetConfig().DB.DSN)
 		}
-	case defs.DBTypeMysql:
-		if mysqlDB, err := gorm.Open(mysql.Open(appInstance.GetConfig().DB.DSN), &gorm.Config{}); err != nil {
-			logger.Logger(ctx).Panic(err)
-		} else {
-			appInstance.GetDBManager().SetDB(defs.DBTypeMysql, defs.DBRoleDefault, mysqlDB)
-			logger.Logger(ctx).Infof("init database success, data type: [%s]", "mysql")
-		}
 	case defs.DBTypePostgres:
-		if postgresDB, err := gorm.Open(postgres.Open(appInstance.GetConfig().DB.DSN), &gorm.Config{}); err != nil {
+		if postgresDB, err := gorm.Open(postgres.Open(appInstance.GetConfig().DB.DSN), databaseConfig()); err != nil {
 			logger.Logger(ctx).Panic(err)
 		} else {
 			appInstance.GetDBManager().SetDB(defs.DBTypePostgres, defs.DBRoleDefault, postgresDB)
@@ -139,7 +125,7 @@ func NewDBManager(ctx *app.Context, appInstance app.Application) app.DBManager {
 		logger.Logger(ctx).Panicf("currently unsupported database type: %s", appInstance.GetConfig().DB.Type)
 	}
 
-	memoryDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	memoryDB, err := gorm.Open(sqlite.Open(":memory:"), databaseConfig())
 	if err != nil {
 		logger.Logger(ctx).Panic(err)
 	}
@@ -148,6 +134,16 @@ func NewDBManager(ctx *app.Context, appInstance app.Application) app.DBManager {
 
 	appInstance.GetDBManager().Init()
 	return mgr
+}
+
+func databaseConfig() *gorm.Config {
+	return &gorm.Config{
+		// The inherited v1 association graph contains circular ownership edges.
+		// v2 migrations create portable tables first; authorization and tenant
+		// boundaries are enforced by explicit repository queries.
+		DisableForeignKeyConstraintWhenMigrating: true,
+		TranslateError:                           true,
+	}
 }
 
 func NewMasterTLSConfig(ctx *app.Context) *tls.Config {
@@ -197,7 +193,7 @@ func NewWSGrpcHandler(ctx *app.Context, ws *wsgrpc.WSListener, upgrader *websock
 
 func NewWSUpgrader(ctx *app.Context, cfg conf.Config) *websocket.Upgrader {
 	return &websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
+		CheckOrigin: func(r *http.Request) bool { return utils.IsOriginAllowed(r, cfg.App.AllowedOrigins) },
 	}
 }
 
@@ -221,7 +217,7 @@ func NewServerCred(appInstance app.Application) credentials.TransportCredentials
 	clientSecret := cfg.Client.Secret
 	ctx := context.Background()
 
-	cred, err := utils.TLSClientCertNoValidate(rpc.GetClientCert(appInstance, clientID, clientSecret, pb.ClientType_CLIENT_TYPE_FRPS))
+	cred, err := utils.TLSClientCert(rpc.GetClientCert(appInstance, clientID, clientSecret, pb.ClientType_CLIENT_TYPE_FRPS))
 	if err != nil {
 		logger.Logger(ctx).WithError(err).Fatal("new tls client cert failed")
 	}
@@ -236,7 +232,7 @@ func NewClientCred(appInstance app.Application) credentials.TransportCredentials
 	clientSecret := cfg.Client.Secret
 	ctx := context.Background()
 
-	cred, err := utils.TLSClientCertNoValidate(rpc.GetClientCert(appInstance, clientID, clientSecret, pb.ClientType_CLIENT_TYPE_FRPC))
+	cred, err := utils.TLSClientCert(rpc.GetClientCert(appInstance, clientID, clientSecret, pb.ClientType_CLIENT_TYPE_FRPC))
 	if err != nil {
 		logger.Logger(ctx).WithError(err).Fatal("new tls client cert failed")
 	}
@@ -281,84 +277,6 @@ func NewConfigPrinter(param struct {
 	logger.Logger(ctx).Infof("%scurrent version: \n%s%s", splitter, conf.GetVersion().String(), splitter)
 }
 
-func NewAutoJoin(param struct {
-	fx.In
-
-	Role       defs.AppRole
-	Ctx        *app.Context
-	Cfg        conf.Config `name:"argsPatchedConfig"`
-	CommonArgs CommonArgs
-}) conf.Config { // provide final config
-	var (
-		ctx          = param.Ctx
-		clientID     = param.Cfg.Client.ID
-		clientSecret = param.Cfg.Client.Secret
-		autoJoin     = false
-		appInstance  = param.Ctx.GetApp()
-	)
-
-	appInstance.SetConfig(param.Cfg)
-
-	if param.Role != defs.AppRole_Client {
-		return param.Cfg
-	}
-
-	// 用户不输入clientID和clientSecret时，使用autoJoin
-	if len(clientSecret) == 0 || len(clientID) == 0 {
-		if param.CommonArgs.JoinToken != nil && len(*param.CommonArgs.JoinToken) > 0 {
-			autoJoin = true
-		} else {
-			if len(clientSecret) == 0 {
-				logger.Logger(ctx).Fatal("client secret cannot be empty")
-			}
-
-			if len(clientID) == 0 {
-				logger.Logger(ctx).Fatal("client id cannot be empty")
-			}
-		}
-	}
-
-	if autoJoin {
-		logger.Logger(ctx).Infof("start to try join master, clientID: [%s], clientSecret: [%s]", clientID, clientSecret)
-		cli, err := JoinMaster(param.Cfg, param.CommonArgs)
-		if err != nil {
-			logger.Logger(ctx).Fatalf("join master failed: %s", err.Error())
-		}
-		logger.Logger(ctx).Infof("join master success, clientID: [%s], clientInfo: [%s]", cli.GetId(), cli.String())
-		tmpCfg := appInstance.GetConfig()
-		tmpCfg.Client.ID = cli.GetId()
-		tmpCfg.Client.Secret = cli.GetSecret()
-		appInstance.SetConfig(tmpCfg)
-	}
-	return appInstance.GetConfig()
-}
-
-func NewPermissionManager(param struct {
-	fx.In
-
-	Enforcer    *casbin.Enforcer
-	AppInstance app.Application
-}) app.PermissionManager {
-	permMgr := rbac.NewPermManager(param.Enforcer)
-	param.AppInstance.SetPermManager(permMgr)
-	return permMgr
-}
-
-func NewEnforcer(param struct {
-	fx.In
-
-	Ctx         *app.Context
-	DBmanager   app.DBManager
-	AppInstance app.Application
-}) *casbin.Enforcer {
-	e, err := rbac.InitializeCasbin(param.Ctx, param.DBmanager.GetDefaultDB())
-	if err != nil {
-		logger.Logger(param.Ctx).WithError(err).Fatal("initialize casbin failed")
-	}
-	param.AppInstance.SetEnforcer(e)
-	return e
-}
-
 func NewWorkersManager(lx fx.Lifecycle, mgr app.WorkerExecManager, appInstance app.Application) app.WorkersManager {
 	if !appInstance.GetConfig().Client.Features.EnableFunctions {
 		return nil
@@ -385,7 +303,7 @@ func NewWorkerExecManager(cfg conf.Config, appInstance app.Application) app.Work
 
 	workerdBinPath := cfg.Client.Worker.WorkerdBinaryPath
 
-	if err := os.MkdirAll(cfg.Client.Worker.WorkerdWorkDir, os.ModePerm); err != nil {
+	if err := os.MkdirAll(cfg.Client.Worker.WorkerdWorkDir, 0o750); err != nil {
 		logger.Logger(context.Background()).WithError(err).Fatalf("create work dir failed, path: [%s]", cfg.Client.Worker.WorkerdWorkDir)
 	}
 
@@ -396,5 +314,8 @@ func NewWorkerExecManager(cfg conf.Config, appInstance app.Application) app.Work
 }
 
 func NewWireGuardManager(appInstance app.Application) app.WireGuardManager {
+	if !appInstance.GetConfig().Client.Features.EnableWireGuard {
+		return nil
+	}
 	return wg.NewWireGuardManager(appInstance)
 }

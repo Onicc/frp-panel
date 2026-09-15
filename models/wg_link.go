@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/VaalaCat/frp-panel/pb"
+	"github.com/Onicc/frp-panel/pb"
 	"gorm.io/gorm"
 )
 

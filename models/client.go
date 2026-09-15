@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/utils"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/utils"
 	v1 "github.com/fatedier/frp/pkg/config/v1"
 	"github.com/samber/lo"
 	"gorm.io/gorm"
@@ -24,7 +24,7 @@ type ClientEntity struct {
 	TenantID       int    `json:"tenant_id" gorm:"not null"`
 	UserID         int    `json:"user_id" gorm:"not null"`
 	ConfigContent  []byte `json:"config_content"`
-	ConnectSecret  string `json:"connect_secret" gorm:"not null"`
+	ConnectSecret  string `json:"-" gorm:"not null"`
 	Stopped        bool   `json:"stopped"`
 	Comment        string `json:"comment"`
 	IsShadow       bool   `json:"is_shadow" gorm:"index"`

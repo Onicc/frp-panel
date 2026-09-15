@@ -1,0 +1,6 @@
+frp-panel v2 is maintained at https://github.com/Onicc/frp-panel.
+
+This project is derived from VaalaCat/frp-panel and retains its AGPL-3.0
+license. It embeds and orchestrates fatedier/frp, which is licensed under
+Apache-2.0. Individual dependency notices remain governed by their respective
+licenses.

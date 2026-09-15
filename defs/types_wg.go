@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"github.com/VaalaCat/frp-panel/pb"
+	"github.com/Onicc/frp-panel/pb"
 	"github.com/samber/lo"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )

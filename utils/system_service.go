@@ -3,12 +3,10 @@ package utils
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path"
-	"path/filepath"
 
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/kardianos/service"
 )
 
@@ -48,7 +46,7 @@ func CreateSystemServiceWithOptions(svcName string, args []string, run func(), o
 	svcConfig := &service.Config{
 		Name:             svcName,
 		DisplayName:      "frp-panel",
-		Description:      "this is frp-panel service, developed by [VaalaCat] - https://github.com/VaalaCat/frp-panel",
+		Description:      "frp-panel service maintained at https://github.com/Onicc/frp-panel",
 		Arguments:        args,
 		WorkingDirectory: path.Dir(currentPath),
 		Option:           options,
@@ -84,38 +82,5 @@ func ControlSystemServiceWithOptions(svcName string, args []string, action strin
 		return err
 	}
 	logger.Logger(ctx).Infof("controller %v service success", action)
-	return nil
-}
-
-func InstallToSystemPath(installPath string) error {
-	currentPath, err := os.Executable()
-	if err != nil {
-		return err
-	}
-
-	targetPath := path.Join(installPath, filepath.Base(currentPath))
-
-	src, err := os.Open(currentPath)
-	if err != nil {
-		return err
-	}
-	defer src.Close()
-
-	dst, err := os.Create(targetPath)
-	if err != nil {
-		return err
-	}
-	defer dst.Close()
-
-	_, err = io.Copy(dst, src)
-	if err != nil {
-		return err
-	}
-
-	err = os.Chmod(targetPath, 0755)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }

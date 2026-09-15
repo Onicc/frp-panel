@@ -12,11 +12,11 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 	"golang.zx2c4.com/wireguard/tun/netstack"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/wg/multibind"
-	"github.com/VaalaCat/frp-panel/utils"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/wg/multibind"
+	"github.com/Onicc/frp-panel/utils"
 )
 
 var (
@@ -30,10 +30,10 @@ type wireGuard struct {
 	endpointPingMap *utils.SyncMap[uint32, uint32] // ms
 	virtAddrPingMap *utils.SyncMap[string, uint32] // ms
 	// ping 平滑器：对“瞬时探测值”做 EWMA 聚合，降低抖动
-	pingAggMu         sync.Mutex
-	endpointPingEWMA  map[uint32]float64 // peerID -> ema(ms)
-	virtAddrPingEWMA  map[string]float64 // virtAddr -> ema(ms)
-	peerDirectory   map[uint32]*pb.WireGuardPeerConfig
+	pingAggMu        sync.Mutex
+	endpointPingEWMA map[uint32]float64 // peerID -> ema(ms)
+	virtAddrPingEWMA map[string]float64 // virtAddr -> ema(ms)
+	peerDirectory    map[uint32]*pb.WireGuardPeerConfig
 	// 仅用于“预连接/保持连接”的 peer（AllowedIPs 为空），用于后续根据拓扑变化做增删
 	preconnectPeers map[uint32]struct{}
 

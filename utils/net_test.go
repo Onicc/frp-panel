@@ -3,7 +3,7 @@ package utils_test
 import (
 	"testing"
 
-	"github.com/VaalaCat/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils"
 )
 
 func TestAllocateIP(t *testing.T) {

@@ -6,8 +6,8 @@ package wg
 import (
 	"errors"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/services/app"
 )
 
 var errWireGuardNotSupported = errors.New("wireguard is not supported on windows build")

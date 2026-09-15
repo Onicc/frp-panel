@@ -2,10 +2,11 @@ package clientrpc
 
 import (
 	"context"
+	"sync"
 
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils/logger"
 )
 
 type ClientRPCHandler interface {
@@ -17,11 +18,13 @@ type ClientRPCHandler interface {
 type clientRPCHandler struct {
 	appInstance  app.Application
 	rpcClient    app.MasterClient
-	done         chan bool
 	handerFunc   func(appInstance app.Application, req *pb.ServerMessage) *pb.ClientMessage
 	clientID     string
 	clientSecret string
 	event        pb.Event
+	ctx          context.Context
+	cancel       context.CancelFunc
+	stopOnce     sync.Once
 }
 
 func NewClientRPCHandler(
@@ -32,15 +35,16 @@ func NewClientRPCHandler(
 	handerFunc func(appInstance app.Application, req *pb.ServerMessage) *pb.ClientMessage,
 ) app.ClientRPCHandler {
 	rpcCli := appInstance.GetMasterCli()
-	done := make(chan bool)
+	ctx, cancel := context.WithCancel(context.Background())
 	return &clientRPCHandler{
 		appInstance:  appInstance,
 		rpcClient:    rpcCli,
-		done:         done,
 		handerFunc:   handerFunc,
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		event:        event,
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 }
 
@@ -51,11 +55,13 @@ func (s *clientRPCHandler) Run() {
 		}
 	}()
 
-	startClientRpcHandler(s.appInstance, s.rpcClient, s.done, s.clientID, s.clientSecret, s.event, s.handerFunc)
+	startClientRpcHandler(s.ctx, s.appInstance, s.rpcClient, s.clientID, s.clientSecret, s.event, s.handerFunc)
 }
 
 func (s *clientRPCHandler) Stop() {
-	close(s.done)
+	s.stopOnce.Do(func() {
+		s.cancel()
+	})
 }
 
 func (s *clientRPCHandler) GetCli() app.MasterClient {

@@ -1,0 +1,12 @@
+.git
+.github
+.idea
+.vscode
+dist
+docs
+node_modules
+www/node_modules
+www/test-results
+www/playwright-report
+*.db
+*.log

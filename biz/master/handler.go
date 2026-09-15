@@ -3,24 +3,27 @@ package master
 import (
 	"embed"
 
-	"github.com/VaalaCat/frp-panel/biz/master/auth"
-	"github.com/VaalaCat/frp-panel/biz/master/client"
-	"github.com/VaalaCat/frp-panel/biz/master/platform"
-	"github.com/VaalaCat/frp-panel/biz/master/proxy"
-	"github.com/VaalaCat/frp-panel/biz/master/server"
-	"github.com/VaalaCat/frp-panel/biz/master/shell"
-	"github.com/VaalaCat/frp-panel/biz/master/streamlog"
-	"github.com/VaalaCat/frp-panel/biz/master/user"
-	"github.com/VaalaCat/frp-panel/biz/master/worker"
-	"github.com/VaalaCat/frp-panel/middleware"
-	"github.com/VaalaCat/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/biz/master/auth"
+	"github.com/Onicc/frp-panel/biz/master/client"
+	"github.com/Onicc/frp-panel/biz/master/platform"
+	"github.com/Onicc/frp-panel/biz/master/proxy"
+	"github.com/Onicc/frp-panel/biz/master/server"
+	"github.com/Onicc/frp-panel/biz/master/shell"
+	"github.com/Onicc/frp-panel/biz/master/streamlog"
+	"github.com/Onicc/frp-panel/biz/master/user"
+	v2 "github.com/Onicc/frp-panel/biz/master/v2"
+	"github.com/Onicc/frp-panel/biz/master/worker"
+	"github.com/Onicc/frp-panel/middleware"
+	"github.com/Onicc/frp-panel/services/app"
 	"github.com/gin-gonic/gin"
 
-	wgHandler "github.com/VaalaCat/frp-panel/biz/master/wg"
+	wgHandler "github.com/Onicc/frp-panel/biz/master/wg"
 )
 
 func NewRouter(fs embed.FS, appInstance app.Application) *gin.Engine {
 	router := gin.Default()
+	_ = router.SetTrustedProxies(nil)
+	router.Use(middleware.SecurityHeaders())
 	HandleStaticFile(fs, router)
 	ConfigureRouter(appInstance, router)
 	return router
@@ -31,9 +34,10 @@ func ConfigureRouter(appInstance app.Application, router *gin.Engine) {
 
 	api := router.Group("/api")
 	api.POST("/v1/auth/cert", app.Wrapper(appInstance, auth.GetClientCert))
-	api.POST("/v1/auth/login", app.Wrapper(appInstance, auth.LoginHandler))
-	api.POST("/v1/auth/register", app.Wrapper(appInstance, auth.RegisterHandler))
+	api.POST("/v1/auth/login", middleware.LoginRateLimit(), app.Wrapper(appInstance, auth.LoginHandler))
+	api.POST("/v1/auth/register", middleware.LoginRateLimit(), app.Wrapper(appInstance, auth.RegisterHandler))
 	api.GET("/v1/auth/logout", auth.RemoveJWTHandler(appInstance))
+	v2.Configure(api.Group("/v2"), appInstance)
 
 	v1 := api.Group("/v1", middleware.JWTAuth(appInstance), middleware.AuthCtx(appInstance), middleware.RBAC(appInstance))
 	{
@@ -41,7 +45,6 @@ func ConfigureRouter(appInstance app.Application, router *gin.Engine) {
 		{
 			userRouter.POST("/get", app.Wrapper(appInstance, user.GetUserInfoHandler))
 			userRouter.POST("/update", app.Wrapper(appInstance, user.UpdateUserInfoHander))
-			userRouter.POST("/sign-token", app.Wrapper(appInstance, user.SignTokenHandler))
 		}
 		platformRouter := v1.Group("/platform")
 		{
@@ -51,7 +54,6 @@ func ConfigureRouter(appInstance app.Application, router *gin.Engine) {
 		clientRouter := v1.Group("/client")
 		{
 			clientRouter.POST("/get", app.Wrapper(appInstance, client.GetClientHandler))
-			clientRouter.POST("/init", app.Wrapper(appInstance, client.InitClientHandler))
 			clientRouter.POST("/delete", app.Wrapper(appInstance, client.DeleteClientHandler))
 			clientRouter.POST("/list", app.Wrapper(appInstance, client.ListClientsHandler))
 			clientRouter.POST("/install_workerd", app.Wrapper(appInstance, worker.InstallWorkerd))

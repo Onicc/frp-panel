@@ -1,20 +1,22 @@
 package conf
 
 import (
-	"fmt"
-	"net/url"
 	"testing"
+
+	"github.com/Onicc/frp-panel/defs"
 )
 
-func TestGetRPCConnInfo(t *testing.T) {
-	parsedUrl, err := url.Parse("grpc://123123:88/123123")
-	if err != nil {
+func TestPermissionsForRole(t *testing.T) {
+	owner := PermissionsForRole(defs.UserRole_Owner)
+	if len(owner) != 1 || owner[0].Method != "*" || owner[0].Path != "*" {
+		t.Fatalf("owner permissions: %#v", owner)
 	}
-
-	connInfo := ConnInfo{
-		Host:   parsedUrl.Host,
-		Scheme: Scheme(parsedUrl.Scheme),
+	viewer := PermissionsForRole(defs.UserRole_Viewer)
+	if len(viewer) < 2 {
+		t.Fatalf("viewer cannot access read endpoints: %#v", viewer)
 	}
-
-	fmt.Printf("%+v", connInfo)
+	operator := PermissionsForRole(defs.UserRole_Operator)
+	if len(operator) <= len(viewer) {
+		t.Fatalf("operator lacks mutation permissions: %#v", operator)
+	}
 }

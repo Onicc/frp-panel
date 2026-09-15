@@ -3,10 +3,10 @@ package wg
 import (
 	"errors"
 
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/dao"
 )
 
 func UpdateEndpoint(ctx *app.Context, req *pb.UpdateEndpointRequest) (*pb.UpdateEndpointResponse, error) {

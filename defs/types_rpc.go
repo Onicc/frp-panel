@@ -1,6 +1,6 @@
 package defs
 
-import "github.com/VaalaCat/frp-panel/pb"
+import "github.com/Onicc/frp-panel/pb"
 
 type Connector struct {
 	CliID   string

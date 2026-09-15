@@ -10,8 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils"
 	"github.com/gorilla/websocket"
 	"golang.zx2c4.com/wireguard/conn"
 )
@@ -254,7 +255,7 @@ func (w *WSBind) HandleHTTP(writer http.ResponseWriter, r *http.Request) error {
 		WriteBufferSize:   wsWriteBufferSize,
 		EnableCompression: false, // WireGuard 数据已加密，压缩无效且浪费 CPU
 		CheckOrigin: func(r *http.Request) bool {
-			return true
+			return utils.IsOriginAllowed(r, "")
 		},
 	}
 

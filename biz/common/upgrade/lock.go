@@ -29,5 +29,3 @@ func lock(workDir string) (unlockFn, error) {
 
 	return func() { _ = os.Remove(lockPath) }, nil
 }
-
-

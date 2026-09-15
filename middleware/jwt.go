@@ -2,15 +2,16 @@ package middleware
 
 import (
 	"errors"
+	"net/http"
 	"strings"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/conf"
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/spf13/cast"
@@ -24,25 +25,6 @@ func JWTAuth(appInstance app.Application) func(c *gin.Context) {
 		}()
 
 		var tokenStr string
-
-		if tokenStr = c.Copy().Query(defs.TokenKey); len(tokenStr) != 0 {
-			if t, err := utils.ParseToken(conf.JWTSecret(appInstance.GetConfig()), tokenStr); err == nil {
-				for k, v := range t {
-					c.Set(k, v)
-				}
-				logger.Logger(c).Debugf("query auth success")
-				if err = resignAndPatchCtxJWT(c, appInstance, cast.ToInt(t[defs.UserIDKey]), t, tokenStr); err != nil {
-					logger.Logger(c).WithError(err).Errorf("resign jwt error")
-					common.ErrUnAuthorized(c, "resign jwt error")
-					c.Abort()
-					return
-				}
-				c.Next()
-				SetToken(c, appInstance, cast.ToInt(t[defs.UserIDKey]), t)
-				return
-			}
-			logger.Logger(c).Debugf("query auth failed")
-		}
 
 		cookieToken, err := c.Cookie(appInstance.GetConfig().App.CookieName)
 		if err == nil {
@@ -90,7 +72,9 @@ func JWTAuth(appInstance app.Application) func(c *gin.Context) {
 			c.Next()
 			return
 		} else {
-			logger.Logger(c).WithError(err).Errorf("jwt middleware parse token error, token: [%s]", tokenStr)
+			logger.Logger(c).WithError(err).Info("jwt middleware rejected authorization header")
+			common.ErrUnAuthorized(c, "invalid authorization")
+			c.Abort()
 		}
 	}
 }
@@ -136,6 +120,7 @@ func SetToken(c *gin.Context, appInstance app.Application, userID int, payload j
 // PushTokenStr 推送token到客户端
 func PushTokenStr(c *gin.Context, appInstance app.Application, tokenStr string) {
 	logger.Logger(c).Debugf("push new token to client")
+	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie(appInstance.GetConfig().App.CookieName,
 		tokenStr,
 		appInstance.GetConfig().App.CookieAge,
@@ -143,5 +128,4 @@ func PushTokenStr(c *gin.Context, appInstance app.Application, tokenStr string) 
 		appInstance.GetConfig().App.CookieDomain,
 		appInstance.GetConfig().App.CookieSecure,
 		appInstance.GetConfig().App.CookieHTTPOnly)
-	c.Header(defs.SetAuthorizationKey, tokenStr)
 }

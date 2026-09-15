@@ -1,19 +1,18 @@
 package middleware
 
 import (
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/models"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/dao"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/models"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cast"
 )
 
 func AuthCtx(appInstance app.Application) func(*gin.Context) {
 	return func(c *gin.Context) {
-		var uid int64
 		var err error
 		var u *models.UserEntity
 		appCtx := app.NewContext(c, appInstance)
@@ -38,19 +37,12 @@ func AuthCtx(appInstance app.Application) func(*gin.Context) {
 			return
 		}
 
-		logger.Logger(c).Debugf("auth middleware authed user is: [%+v]", u)
-
 		if u.Valid() {
 			logger.Logger(c).Debugf("set auth user to context, login success")
 			c.Set(defs.UserInfoKey, u)
 			c.Next()
 			return
 		} else {
-			if uid == 1 {
-				logger.Logger(c).Debugf("seems to be admin assign token login")
-				c.Next()
-				return
-			}
 			logger.Logger(c).Errorf("invalid authorization, auth ctx middleware login failed")
 			common.ErrUnAuthorized(c, "token invalid")
 			c.Abort()
@@ -61,7 +53,7 @@ func AuthCtx(appInstance app.Application) func(*gin.Context) {
 
 func AuthAdmin(c *gin.Context) {
 	u := common.GetUserInfo(c)
-	if u != nil && u.GetRole() == defs.UserRole_Admin {
+	if u == nil || (u.GetRole() != defs.UserRole_Owner && u.GetRole() != defs.UserRole_Admin) {
 		common.ErrUnAuthorized(c, "permission denied")
 		c.Abort()
 		return

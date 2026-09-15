@@ -1,13 +1,13 @@
 package shared
 
 import (
-	bizmaster "github.com/VaalaCat/frp-panel/biz/master"
-	"github.com/VaalaCat/frp-panel/biz/master/shell"
-	"github.com/VaalaCat/frp-panel/biz/master/streamlog"
-	bizserver "github.com/VaalaCat/frp-panel/biz/server"
-	"github.com/VaalaCat/frp-panel/conf"
-	"github.com/VaalaCat/frp-panel/services/rpc"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	bizmaster "github.com/Onicc/frp-panel/biz/master"
+	"github.com/Onicc/frp-panel/biz/master/shell"
+	"github.com/Onicc/frp-panel/biz/master/streamlog"
+	bizserver "github.com/Onicc/frp-panel/biz/server"
+	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/services/rpc"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"go.uber.org/fx"
 )
 
@@ -27,8 +27,6 @@ var (
 	))
 
 	masterMod = fx.Module("cmd.master", fx.Provide(
-		NewPermissionManager,
-		NewEnforcer,
 		conf.GetListener,
 		NewDBManager,
 		NewWSListener,
@@ -55,8 +53,7 @@ var (
 		NewContext,
 		NewAndFinishNormalContext,
 		rpc.NewClientsManager,
-		NewAutoJoin, // provide final config
-		fx.Annotate(NewPatchedConfig, fx.ResultTags(`name:"argsPatchedConfig"`)),
+		NewRuntimeConfig,
 	),
 		fx.Invoke(runProfiler),
 	)

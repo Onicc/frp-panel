@@ -59,5 +59,3 @@ func verifyBinary(path string) error {
 		return nil
 	}
 }
-
-

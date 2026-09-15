@@ -1,0 +1,24 @@
+services:
+  controller:
+    image: onicc/frp-panel:edge
+    restart: unless-stopped
+    environment:
+      APP_GLOBAL_SECRET: ${APP_GLOBAL_SECRET:?set a random 32+ character secret}
+      APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-true}
+      APP_ENABLE_REGISTER: ${APP_ENABLE_REGISTER:-false}
+      MASTER_API_HOST: ${PUBLIC_HOST:?set the public controller hostname}
+      MASTER_RPC_HOST: ${PUBLIC_HOST:?set the public controller hostname}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+      - "7000:7000"
+    volumes:
+      - frp-panel-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9000/api/v2/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  frp-panel-data:

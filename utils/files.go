@@ -1,12 +1,11 @@
 package utils
 
 import (
-	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -14,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/failsafe-go/failsafe-go"
 	"github.com/failsafe-go/failsafe-go/retrypolicy"
 	"github.com/imroc/req/v3"
@@ -27,7 +26,7 @@ func EnsureDirectoryExists(filePath string) error {
 	directory := filepath.Dir(filePath)
 
 	if _, err := os.Stat(directory); os.IsNotExist(err) {
-		err = os.MkdirAll(directory, os.ModePerm)
+		err = os.MkdirAll(directory, 0o750)
 		if err != nil {
 			return err
 		}
@@ -94,26 +93,31 @@ func FindExecutableNames(filter func(name string) bool, extraPaths ...string) ([
 
 }
 
-var TmpFileDir = path.Join(os.TempDir(), "vaala-frp-panel-download")
-
 // DownloadFile 下载文件到一个临时文件，返回临时文件路径
-func DownloadFile(ctx context.Context, url string, proxyUrl string) (string, error) {
-	os.MkdirAll(TmpFileDir, 0777)
-
-	tmpPath, err := os.MkdirTemp(TmpFileDir, "downloads")
+func DownloadFile(ctx context.Context, rawURL string, proxyUrl string) (string, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+		return "", fmt.Errorf("download URL must use https")
+	}
+	tmpPath, err := os.MkdirTemp("", "frp-panel-download-")
 	if err != nil {
 		return "", err
 	}
+	failed := true
+	defer func() {
+		if failed {
+			_ = os.RemoveAll(tmpPath)
+		}
+	}()
 
-	tmpFileName := generateRandomFileName("download", ".tmp")
-	fileFullPath := path.Join(tmpPath, tmpFileName)
+	fileFullPath := path.Join(tmpPath, "download.tmp")
 
 	cli := req.C()
 	if len(proxyUrl) > 0 {
 		cli = cli.SetProxyURL(proxyUrl)
 	}
 
-	logger.Logger(ctx).Infof("Downloading file from url: %s with proxy: %s", url, proxyUrl)
+	logger.Logger(ctx).Infof("downloading verified release asset from host: %s", parsed.Host)
 
 	// 进度条：仅在交互式终端展示，避免污染 service 日志
 	showProgress := isatty.IsTerminal(os.Stderr.Fd())
@@ -171,7 +175,7 @@ func DownloadFile(ctx context.Context, url string, proxyUrl string) (string, err
 				SetOutputFile(fileFullPath).
 				SetDownloadCallbackWithInterval(callback, 200*time.Millisecond).
 				SetRetryCount(0).
-				Get(url)
+				Get(rawURL)
 
 			if bar != nil {
 				_ = bar.Finish()
@@ -190,7 +194,7 @@ func DownloadFile(ctx context.Context, url string, proxyUrl string) (string, err
 			SetContext(ctx).
 			SetOutputFile(fileFullPath).
 			SetRetryCount(0).
-			Get(url)
+			Get(rawURL)
 		if err != nil {
 			return err
 		}
@@ -212,6 +216,7 @@ func DownloadFile(ctx context.Context, url string, proxyUrl string) (string, err
 		logger.Logger(ctx).WithError(err).Error("download file from url error")
 		return "", err
 	}
+	failed = false
 	return fileFullPath, nil
 }
 
@@ -224,10 +229,8 @@ func isRetryableDownloadErr(err error) bool {
 		return true
 	}
 	// 常见网络错误（net.Error）
-	if ne, ok := err.(net.Error); ok {
-		if ne.Timeout() || ne.Temporary() {
-			return true
-		}
+	if ne, ok := err.(net.Error); ok && ne.Timeout() {
+		return true
 	}
 	// 不能用 errors.As（这里为了不引入更多依赖）：
 	// 退而求其次：字符串匹配（兼容 req / tls / http2 的 wrapped error）
@@ -260,79 +263,4 @@ func containsAny(s string, subs ...string) bool {
 		}
 	}
 	return false
-}
-
-// generateRandomFileName 生成一个随机文件名
-func generateRandomFileName(prefix, extension string) string {
-	randomStr := randomString(8)
-	fileName := fmt.Sprintf("%s_%s%s", prefix, randomStr, extension)
-	return fileName
-}
-
-// randomString 生成一个指定长度的随机字符串
-func randomString(length int) string {
-	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	bytes := make([]byte, length)
-	for i := range bytes {
-		bytes[i] = charset[rand.Intn(len(charset))]
-	}
-
-	return string(bytes)
-}
-
-// ExtractGZTo decompresses the srcGZ file into a temporary directory,
-// renames the extracted file to newName, moves it to destDir, and sets executable permissions (0755).
-// It returns the full path of the final file on success.
-func ExtractGZTo(srcGZ, newName, destDir string) (string, error) {
-	// 1. Open source .gz file
-	f, err := os.Open(srcGZ)
-	if err != nil {
-		return "", fmt.Errorf("failed to open source gzip file %q: %w", srcGZ, err)
-	}
-	defer f.Close()
-
-	// 2. Create gzip reader
-	zr, err := gzip.NewReader(f)
-	if err != nil {
-		return "", fmt.Errorf("failed to create gzip reader for %q: %w", srcGZ, err)
-	}
-	defer zr.Close()
-
-	// 3. Create temporary directory
-	tmpDir, err := os.MkdirTemp("", "vaala-frp-panel-gz_extract_*")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temporary directory: %w", err)
-	}
-	// Note: tmpDir is not auto-deleted. Caller may clean up if desired.
-
-	// 4. Create the output file in the temp directory with the new name
-	tmpFilePath := filepath.Join(tmpDir, newName)
-	outFile, err := os.Create(tmpFilePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp file %q: %w", tmpFilePath, err)
-	}
-	defer outFile.Close()
-
-	// 5. Decompress into temp file
-	if _, err := io.Copy(outFile, zr); err != nil {
-		return "", fmt.Errorf("failed to write decompressed data to %q: %w", tmpFilePath, err)
-	}
-
-	// 6. Ensure destination directory exists
-	if err := os.MkdirAll(destDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create destination directory %q: %w", destDir, err)
-	}
-
-	// 7. Move the file to the destination directory
-	finalPath := filepath.Join(destDir, newName)
-	if err := os.Rename(tmpFilePath, finalPath); err != nil {
-		return "", fmt.Errorf("failed to move file to %q: %w", finalPath, err)
-	}
-
-	// 8. Set executable permission
-	if err := os.Chmod(finalPath, 0755); err != nil {
-		return "", fmt.Errorf("failed to set executable permission on %q: %w", finalPath, err)
-	}
-
-	return finalPath, nil
 }

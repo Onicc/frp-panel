@@ -2,42 +2,31 @@ package workerd
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
-	"time"
 
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/sourcegraph/conc"
+	"github.com/Onicc/frp-panel/pb"
 )
 
-func TestRunWorker(t *testing.T) {
-	workerdCWD := "/home/coder/code/frp-panel/tmp/workerd"
-	workerID := "test"
-	workerdBinPath := "/home/coder/go/bin/workerd"
+func TestWorkerFilesStayInsideWorkDirectory(t *testing.T) {
+	root := t.TempDir()
+	workerID := "../../outside"
+	entry := "../../entry.js"
+	code := "export default {}"
+	worker := &pb.Worker{WorkerId: &workerID, CodeEntry: &entry, Code: &code}
+	FillWorkerValue(worker, 1)
 
-	c := context.Background()
-	defaultWorker := &pb.Worker{WorkerId: &workerID}
-	FillWorkerValue(defaultWorker, 1)
-
-	if err := GenCapnpConfig(c, workerdCWD, &pb.WorkerList{Workers: []*pb.Worker{defaultWorker}}); err != nil {
-		panic(err)
+	if err := WriteWorkerCodeToFile(context.Background(), worker, root); err != nil {
+		t.Fatal(err)
 	}
-
-	var wg conc.WaitGroup
-
-	wg.Go(func() {
-		time.Sleep(10 * time.Second)
-	})
-
-	if err := WriteWorkerCodeToFile(c, defaultWorker, workerdCWD); err != nil {
-		panic(err)
+	path := CodeFilePath(context.Background(), worker, root)
+	relative, err := filepath.Rel(root, path)
+	if err != nil || strings.HasPrefix(relative, "..") {
+		t.Fatalf("worker escaped root: %s", path)
 	}
-
-	runner := NewExecManager(workerdBinPath,
-		[]string{"serve", "--watch", "--verbose"})
-	runner.RunCmd(workerID, WorkerCWDPath(c, defaultWorker, workerdCWD),
-		[]string{ConfigFilePath(c, defaultWorker, workerdCWD)})
-
-	defer runner.ExitAllCmd()
-
-	wg.Wait()
+	if data, err := os.ReadFile(path); err != nil || string(data) != code {
+		t.Fatalf("worker code was not safely written: %q %v", data, err)
+	}
 }

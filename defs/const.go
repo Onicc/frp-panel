@@ -5,22 +5,21 @@ import (
 )
 
 const (
-	AuthorizationKey    = "authorization"
-	SetAuthorizationKey = "x-set-authorization"
-	MsgKey              = "msg"
-	UserIDKey           = "x-vaala-userid"
-	EndpointKey         = "endpoint"
-	IpAddrKey           = "ipaddr"
-	HeaderKey           = "header"
-	MethodKey           = "method"
-	UAKey               = "User-Agent"
-	ContentTypeKey      = "Content-Type"
-	TraceIDKey          = "TraceID"
-	TokenKey            = "token"
-	FRPAuthTokenKey     = "token"
-	ErrKey              = "err"
-	UserInfoKey         = "x-vaala-userinfo"
-	FRPClientIDKey      = "x-vaala-frp-client-id"
+	AuthorizationKey = "authorization"
+	MsgKey           = "msg"
+	UserIDKey        = "x-frp-panel-userid"
+	EndpointKey      = "endpoint"
+	IpAddrKey        = "ipaddr"
+	HeaderKey        = "header"
+	MethodKey        = "method"
+	UAKey            = "User-Agent"
+	ContentTypeKey   = "Content-Type"
+	TraceIDKey       = "TraceID"
+	TokenKey         = "token"
+	FRPAuthTokenKey  = "token"
+	ErrKey           = "err"
+	UserInfoKey      = "x-frp-panel-userinfo"
+	FRPClientIDKey   = "x-frp-panel-client-id"
 )
 
 const (
@@ -65,7 +64,6 @@ const (
 const (
 	DefaultServerID    = "default"
 	DefaultAdminUserID = 1
-	DefaultServiceName = "frpp"
 )
 
 const (
@@ -85,17 +83,8 @@ const (
 )
 
 const (
-	CurEnvPath         = ".env"
-	SysEnvPath         = "/etc/frpp/.env"
-	EnvClientID        = "CLIENT_ID"
-	EnvClientSecret    = "CLIENT_SECRET"
-	EnvMasterRPCHost   = "MASTER_RPC_HOST"
-	EnvMasterAPIHost   = "MASTER_API_HOST"
-	EnvMasterRPCPort   = "MASTER_RPC_PORT"
-	EnvMasterAPIPort   = "MASTER_API_PORT"
-	EnvMasterAPIScheme = "MASTER_API_SCHEME"
-	EnvClientAPIUrl    = "CLIENT_API_URL"
-	EnvClientRPCUrl    = "CLIENT_RPC_URL"
+	CurEnvPath = ".env"
+	SysEnvPath = "/etc/frp-panel/controller.env"
 )
 
 const (
@@ -105,17 +94,19 @@ const (
 
 const (
 	DBTypeSQLite3  = "sqlite3"
-	DBTypeMysql    = "mysql"
 	DBTypePostgres = "postgres"
 )
 
 const (
-	UserRole_Admin  = "admin"
-	UserRole_Normal = "normal"
-	CapFileName     = "workerd.capnp"
-	WorkerInfoPath  = "workers"
-	WorkerCodePath  = "src"
-	DBTypeSqlite    = "sqlite"
+	UserRole_Owner    = "owner"
+	UserRole_Admin    = "admin"
+	UserRole_Operator = "operator"
+	UserRole_Viewer   = "viewer"
+	UserRole_Normal   = UserRole_Viewer
+	CapFileName       = "workerd.capnp"
+	WorkerInfoPath    = "workers"
+	WorkerCodePath    = "src"
+	DBTypeSqlite      = "sqlite"
 
 	DefaultHostName       = "127.0.0.1"
 	DefaultNodeName       = "default"
@@ -202,5 +193,5 @@ var VaalaMagicBytes = []byte("vaala-ping")
 const VaalaMagicBytesCookie = uint32(1630367849)
 
 const (
-	DefaultWSHandlerPath = "/api/x-vaala-transport/ws"
+	DefaultWSHandlerPath = "/api/frp-panel-transport/ws"
 )

@@ -7,11 +7,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/rpc"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/rpc"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/fatedier/golib/log"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -53,7 +54,7 @@ func ptyHandler(c *gin.Context, appInstance app.Application) {
 	)
 
 	if initHeight != "" {
-		initHeightInt, err = strconv.Atoi(initHeight)
+		initHeightInt, err = parsePTYDimension(initHeight)
 		if err != nil {
 			logger.Logger(c).WithError(err).Infof("invalid height")
 			webConn.Close()
@@ -62,7 +63,7 @@ func ptyHandler(c *gin.Context, appInstance app.Application) {
 	}
 
 	if initWidth != "" {
-		initWidthInt, err = strconv.Atoi(initWidth)
+		initWidthInt, err = parsePTYDimension(initWidth)
 		if err != nil {
 			logger.Logger(c).WithError(err).Infof("invalid width")
 			webConn.Close()
@@ -231,11 +232,18 @@ func ptyHandler(c *gin.Context, appInstance app.Application) {
 	connectionClosed = true
 }
 
+func parsePTYDimension(value string) (int, error) {
+	dimension, err := strconv.ParseUint(value, 10, 16)
+	if err != nil || dimension == 0 {
+		return 0, fmt.Errorf("invalid terminal dimension %q", value)
+	}
+	return int(dimension), nil
+}
+
 func getUpgrader(c *gin.Context) websocket.Upgrader {
 	return websocket.Upgrader{
-		// cross origin domain
 		CheckOrigin: func(r *http.Request) bool {
-			return true
+			return utils.IsOriginAllowed(r, "")
 		},
 		// 处理 Sec-WebSocket-Protocol Header
 		Subprotocols: []string{c.GetHeader("Sec-WebSocket-Protocol")},

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils"
 	v1 "github.com/fatedier/frp/pkg/config/v1"
 	"gorm.io/gorm"
 )
@@ -20,7 +20,7 @@ type ServerEntity struct {
 	UserID        int               `json:"user_id" gorm:"not null"`
 	ServerIP      string            `json:"server_ip"`
 	ConfigContent []byte            `json:"config_content"`
-	ConnectSecret string            `json:"connect_secret" gorm:"not null"`
+	ConnectSecret string            `json:"-" gorm:"not null"`
 	Comment       string            `json:"comment"`
 	FrpsUrls      GormArray[string] `json:"frps_urls"`
 	CreatedAt     time.Time
@@ -57,5 +57,5 @@ func (s *ServerEntity) ConfigEqual(cfg *v1.ServerConfig) bool {
 		return false
 	}
 
-	return utils.MD5(s.ConfigContent) == utils.MD5(raw)
+	return utils.SHA256(s.ConfigContent) == utils.SHA256(raw)
 }

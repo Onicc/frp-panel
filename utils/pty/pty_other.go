@@ -65,6 +65,9 @@ func (pty *Pty) Getsize() (uint16, uint16, error) {
 }
 
 func (pty *Pty) Setsize(cols, rows uint32) error {
+	if cols > 65535 || rows > 65535 {
+		return errors.New("terminal size exceeds uint16 limits")
+	}
 	return opty.Setsize(pty.tty, &opty.Winsize{
 		Cols: uint16(cols),
 		Rows: uint16(rows),
@@ -75,10 +78,12 @@ func (pty *Pty) killChildProcess(c *exec.Cmd) error {
 	pgid, err := syscall.Getpgid(c.Process.Pid)
 	if err != nil {
 		// Fall-back on error. Kill the main process only.
-		c.Process.Kill()
+		return c.Process.Kill()
 	}
 	// Kill the whole process group.
-	syscall.Kill(-pgid, syscall.SIGKILL) // SIGKILL 直接杀掉 SIGTERM 发送信号，等待进程自己退出
+	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
+		return err
+	}
 	return c.Wait()
 }
 

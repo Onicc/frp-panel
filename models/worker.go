@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/utils"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/utils"
 	v1 "github.com/fatedier/frp/pkg/config/v1"
 	"github.com/samber/lo"
 	"gorm.io/gorm"
@@ -89,5 +89,5 @@ func (w *Worker) ToPB() *pb.Worker {
 }
 
 func HttpIngressLBGroup(workerId string, cfg *v1.HTTPProxyConfig) string {
-	return fmt.Sprintf("lb-group-%s-%s", workerId, utils.MD5(fmt.Sprint(cfg.DomainConfig.CustomDomains, cfg.SubDomain)))
+	return fmt.Sprintf("lb-group-%s-%s", workerId, utils.SHA256(fmt.Sprint(cfg.DomainConfig.CustomDomains, cfg.SubDomain)))
 }

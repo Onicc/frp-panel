@@ -3,32 +3,31 @@ package middleware
 import (
 	"regexp"
 
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/models"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/gin-gonic/gin"
 )
 
-func RBAC(appInstance app.Application) func(*gin.Context) {
+func RBAC(_ app.Application) func(*gin.Context) {
 	return func(c *gin.Context) {
 		// appCtx := app.NewContext(c, appInstance)
-		perms, err := common.GetTokenPermission(c)
 		userInfo := common.GetUserInfo(c)
-		token := common.GetTokenString(c)
-		path := c.Request.URL.Path
-		method := c.Request.Method
-
-		if err != nil {
-			logger.Logger(c).WithError(err).Errorf("get token permission error, token: [%s], userInfo:[%s]", token, utils.MarshalForJson(userInfo.GetSafeUserInfo()))
-			common.ErrResp(c, &pb.CommonResponse{Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: err.Error()}}, err.Error())
+		if userInfo == nil || !userInfo.Valid() {
+			common.ErrUnAuthorized(c, "invalid user")
 			c.Abort()
 			return
 		}
+		perms := conf.PermissionsForRole(userInfo.GetRole())
+		path := c.Request.URL.Path
+		method := c.Request.Method
 
 		if len(perms) == 0 {
-			logger.Logger(c).WithError(err).Errorf("user has no permission, token: [%s], userInfo:[%s]", token, utils.MarshalForJson(userInfo.GetSafeUserInfo()))
+			logger.Logger(c).Errorf("user has no permission, userInfo:[%s]", safeUserInfo(userInfo))
 			common.ErrResp(c, &pb.CommonResponse{Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: "user has no permission"}}, "user has no permission")
 			c.Abort()
 			return
@@ -47,10 +46,9 @@ func RBAC(appInstance app.Application) func(*gin.Context) {
 			}
 		}
 
-		logger.Logger(c).Errorf("user has no permission, perms: %s, userInfo: [%s], ", utils.MarshalForJson(perms), utils.MarshalForJson(userInfo.GetSafeUserInfo()))
+		logger.Logger(c).Errorf("user has no permission, perms: %s, userInfo: [%s]", utils.MarshalForJson(perms), safeUserInfo(userInfo))
 		common.ErrResp(c, &pb.CommonResponse{Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: "user has no permission"}}, "user has no permission")
 		c.Abort()
-		return
 	}
 }
 
@@ -75,8 +73,16 @@ func ruleMatched(param ruleMatchParam) bool {
 	if param.RulePath == "*" {
 		pathMatch = true
 	} else {
-		pathMatch = regexp.MustCompile(param.RulePath).MatchString(param.RequestPath)
+		rule, err := regexp.Compile(param.RulePath)
+		pathMatch = err == nil && rule.MatchString(param.RequestPath)
 	}
 
 	return pathMatch
+}
+
+func safeUserInfo(userInfo models.UserInfo) string {
+	if userInfo == nil {
+		return "unknown"
+	}
+	return utils.MarshalForJson(userInfo.GetSafeUserInfo())
 }

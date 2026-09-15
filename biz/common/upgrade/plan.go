@@ -96,7 +96,7 @@ func writeStatus(workDir string, success bool, msg string) error {
 	if err != nil {
 		return fmt.Errorf("marshal status failed: %w", err)
 	}
-	return os.WriteFile(statusPath(workDir), b, 0644)
+	return os.WriteFile(statusPath(workDir), b, 0600)
 }
 
 // Status 对外暴露升级结果（给 `upgrade status` 使用）

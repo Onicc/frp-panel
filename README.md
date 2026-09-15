@@ -1,70 +1,63 @@
-# FRP-Panel
+# frp-panel v2
 
-FRP-Panel is a visualization management dashboard for FRP, offering centralized configuration, unified credentials, dynamic scheduling, and edge Worker support—making NAT traversal and service exposure simpler, safer, and more efficient.
+An open-source FRP control plane with a secure Web console and a cross-platform node Agent.
 
-[Detailed Documentation (Wiki)](https://vaala.cat/frp-panel/en/) · [Development Blog](https://vaala.cat/posts/frp-panel-doc/) · [Screenshots & Videos](https://vaala.cat/frp-panel/en/screenshots) · QQ Group: 830620423
+> v2 is a clean break. It does not migrate v1 databases or preserve the old client CLI.
 
-> [WireGuard Multi-Hop Smart Networking Dev Notes](https://vaala.cat/posts/frp-panel-with-wireguard/) — includes a funny demo you can try.
+## What changed
 
-English | [中文](./README_zh.md)
+- Separate `frp-panel` controller and lightweight `frp-panel-agent` deliverables.
+- Linux amd64/arm64, macOS amd64/arm64, and Windows amd64/arm64 Agent builds.
+- Correct system installation paths; the bootstrap command never installs into the current directory.
+- Vite 8 / React 19 bilingual console with controlled mutation dialogs.
+- Secure defaults: TLS verification on; privileged features off; Argon2id passwords; role-derived permissions; same-origin WebSockets; protected Agent config.
+- Reproducible multi-architecture images: `onicc/frp-panel` and `onicc/frp-panel-agent`.
+- SHA-256 release checksums, SBOMs, build provenance, and pinned GitHub Actions.
 
-<div align="center">
-  <a href="https://trendshift.io/repositories/7147" target="_blank">
-    <img src="https://trendshift.io/api/badge/repositories/7147" alt="VaalaCat/frp-panel | Trendshift" width="250" height="55"/>
-  </a>
-</div>
+## Run the controller
 
-## Key Advantages
+Generate a secret first:
 
-| Advantage               | Description                                                                 |
-|:-----------------------|:----------------------------------------------------------------------------|
-| Centralized Configuration | All client/server configs are managed by Master—no manual JSON editing       |
-| Multi-node Management     | Monitor and orchestrate any number of frpc (clients) and frps (servers)      |
-| Visual Interface          | Create, edit, and monitor tunnels and Workers via Web UI, with real-time logs and stats |
-| Simplified Credential Distribution | Auto-generate and distribute startup commands—no manual parameter passing |
-| Edge Worker Deployment    | Deploy custom Workers on Clients, expose them via Server, and adjust configs live via Master |
-| WireGuard Smart Networking | WireGuard over UDP/WebSocket with multi-hop routing, custom routes/topology, and latency + bandwidth-aware path selection |
+```bash
+export APP_GLOBAL_SECRET="$(openssl rand -hex 32)"
+export PUBLIC_HOST="panel.example.com"
+export APP_ENABLE_REGISTER=true
+docker compose up -d
+```
 
-> Networking is currently in beta. Please share feedback.  
-> Networking requires at least one client with a public IP as a relay, and currently supports Linux systems only.
+Create the initial Owner in the Web console, then set `APP_ENABLE_REGISTER=false` and run `docker compose up -d` again. The Web/API listener is `9000`, Agent RPC is `9001`, and the built-in default FRPS uses `7000`. Put the Web endpoint behind HTTPS and leave `APP_COOKIE_SECURE=true` in production.
 
-## Architecture Overview
+## Install an Agent
 
-![Architecture Diagram](./docs/public/images/arch.svg)
+Create a 10-minute enrollment command in **Nodes → Add node**, select Linux, macOS, or Windows, and copy the generated command. The Agent installs to:
 
-1. **Master** – Centralized management and authentication; requires access from all Servers and Clients  
-2. **Server** – Public-facing entry point that handles traffic for Clients  
-3. **Client** – Internal proxy that supports deploying Workers and WireGuard mesh networking  
+| OS | Binary | Config and state |
+|---|---|---|
+| Linux | `/usr/local/libexec/frp-panel/frp-panel-agent` | `/etc/frp-panel/agent.yaml`, `/var/lib/frp-panel` |
+| macOS | `/usr/local/libexec/frp-panel/frp-panel-agent` | `/Library/Application Support/frp-panel` |
+| Windows | `%ProgramFiles%\frp-panel\frp-panel-agent.exe` | `%ProgramData%\frp-panel` |
 
-## Community & Sponsorship
+The service is named `frp-panel-agent`. Use `frp-panel-agent service status`, `restart`, or `uninstall --purge`; run `frp-panel-agent doctor --json` for capability and configuration diagnostics.
 
-FRP-Panel is fully open source—welcome Stars, Issues, and PRs.  
-If FRP-Panel brings you value, consider sponsoring the author:
+## Development
 
-- Email: me@vaala.cat
+Requires Go 1.27.1 and Node.js 24 LTS.
 
-Sponsored by [NodeSupport](https://github.com/NodeSeekDev/NodeSupport) / [DartNode](https://dartnode.com) / [DK Cloud](https://www.dkdun.cn)
+```bash
+corepack enable
+cd www && pnpm install --frozen-lockfile && pnpm build && cd ..
+go test ./...
+go build ./cmd/frpp ./cmd/frp-panel-agent
+```
 
-<div align="left">
-  <a href="https://yxvm.com/">
-    <img src="https://github.com/user-attachments/assets/0bd7087a-7994-4caf-a465-a428af19c5aa" width="300"/>
-  </a>
-  <div align="left">
-  <a href="https://dartnode.com">
-    <img src="https://dartnode.com/branding/DN-Open-Source-sm.png" width="300"/>
-  </a>
-</div>
-  <div align="left">
-  <a href="https://www.dkdun.cn">
-    <img src="https://www.dkdun.cn/themes/web/www/upload/local68c2dbb2ab148.png" width="300"/>
-  </a>
-</div>
-</div>
+See [architecture](docs/ARCHITECTURE_V2.md), [optimization review](docs/OPTIMIZATION.md), [platform support](docs/SUPPORT_MATRIX.md), [security review](docs/SECURITY.md), and [OpenAPI](api/openapi.yaml).
 
-## Project Status
+## Releases
 
-[![Star History](https://api.star-history.com/svg?repos=vaalacat/frp-panel&type=Date)](https://www.star-history.com/#vaalacat/frp-panel&Date)
+- Every successful `main` push updates the `edge` binaries and the `edge` tags on both Docker images.
+- A `v*` tag creates a stable GitHub release and publishes that tag plus `latest` to Docker Hub.
+- Stable releases include checksums, SBOMs, and GitHub artifact attestations. Apple notarization and Windows Authenticode are not currently provided.
 
----
+## License and attribution
 
-For more deployment, usage, and configuration details, see the Wiki → [FRP-Panel Wiki](https://vaala.cat/frp-panel/en/)
+AGPL-3.0. This fork is maintained by Onicc and is derived from [VaalaCat/frp-panel](https://github.com/VaalaCat/frp-panel). See [NOTICE](NOTICE).

@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/services/wg/multibind"
-	"github.com/VaalaCat/frp-panel/services/wg/transport/ws"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/services/wg/multibind"
+	"github.com/Onicc/frp-panel/services/wg/transport/ws"
 
 	"golang.zx2c4.com/wireguard/conn"
 )

@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	WSGrpcError = errors.New("wsgrpc error")
+	ErrWSGRPC = errors.New("wsgrpc error")
 )
 
 // ---------------------------------------
@@ -40,17 +40,17 @@ func (c *websocketConn) Read(p []byte) (int, error) {
 	if c.readBuffer.Len() == 0 {
 		messageType, data, err := c.ws.ReadMessage()
 		if err != nil {
-			return 0, errors.Join(err, errors.New("wsgrpc read message error"), WSGrpcError)
+			return 0, errors.Join(err, errors.New("wsgrpc read message error"), ErrWSGRPC)
 		}
 		// 只接受二进制数据
 		if messageType != websocket.BinaryMessage {
-			return 0, errors.Join(fmt.Errorf("unexpected message type: %d", messageType), WSGrpcError)
+			return 0, errors.Join(fmt.Errorf("unexpected message type: %d", messageType), ErrWSGRPC)
 		}
 		c.readBuffer.Write(data)
 	}
 
 	if n, err := c.readBuffer.Read(p); err != nil {
-		return n, errors.Join(err, WSGrpcError)
+		return n, errors.Join(err, ErrWSGRPC)
 	} else {
 		return n, nil
 	}
@@ -63,7 +63,7 @@ func (c *websocketConn) Write(p []byte) (int, error) {
 
 	err := c.ws.WriteMessage(websocket.BinaryMessage, p)
 	if err != nil {
-		return 0, errors.Join(err, errors.New("wsgrpc write message error"), WSGrpcError)
+		return 0, errors.Join(err, errors.New("wsgrpc write message error"), ErrWSGRPC)
 	}
 	return len(p), nil
 }
@@ -72,7 +72,7 @@ func (c *websocketConn) Write(p []byte) (int, error) {
 func (c *websocketConn) Close() error {
 	err := c.ws.Close()
 	if err != nil {
-		return errors.Join(err, errors.New("wsgrpc close error"), WSGrpcError)
+		return errors.Join(err, errors.New("wsgrpc close error"), ErrWSGRPC)
 	}
 	return nil
 }
@@ -96,10 +96,10 @@ func (c *websocketConn) RemoteAddr() net.Addr {
 // SetDeadline 同时设置读写超时
 func (c *websocketConn) SetDeadline(t time.Time) error {
 	if err := c.ws.SetReadDeadline(t); err != nil {
-		return errors.Join(err, errors.New("wsgrpc set read deadline error"), WSGrpcError)
+		return errors.Join(err, errors.New("wsgrpc set read deadline error"), ErrWSGRPC)
 	}
 	if err := c.ws.SetWriteDeadline(t); err != nil {
-		return errors.Join(err, errors.New("wsgrpc set write deadline error"), WSGrpcError)
+		return errors.Join(err, errors.New("wsgrpc set write deadline error"), ErrWSGRPC)
 	}
 	return nil
 }
@@ -128,13 +128,13 @@ type LogInterface interface {
 func WebsocketDialer(url string, header http.Header, insecure bool, log LogInterface) func(ctx context.Context, addr string) (net.Conn, error) {
 	return func(ctx context.Context, addr string) (net.Conn, error) {
 		dialer := websocket.Dialer{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}, // #nosec G402 -- caller-controlled explicit unsafe compatibility option
 		}
 		log.Tracef("dialing websocket server [%s]", url)
 		ws, _, err := dialer.DialContext(ctx, url, header)
 		if err != nil {
 			log.Errorf("wsgrpc dialer error: %v", err)
-			return nil, errors.Join(err, errors.New("wsgrpc dialer error"), WSGrpcError)
+			return nil, errors.Join(err, errors.New("wsgrpc dialer error"), ErrWSGRPC)
 		}
 		log.Tracef("websocket connection connect done")
 		return &websocketConn{ws: ws}, nil
@@ -184,11 +184,11 @@ func (l *WSListener) Accept() (net.Conn, error) {
 	select {
 	case conn, ok := <-l.connCh:
 		if !ok {
-			return nil, errors.Join(fmt.Errorf("listener closed"), WSGrpcError)
+			return nil, errors.Join(fmt.Errorf("listener closed"), ErrWSGRPC)
 		}
 		return conn, nil
 	case <-l.done:
-		return nil, errors.Join(fmt.Errorf("listener closed"), WSGrpcError)
+		return nil, errors.Join(fmt.Errorf("listener closed"), ErrWSGRPC)
 	}
 }
 
@@ -233,80 +233,3 @@ func GinWSHandler(listener *WSListener, upgrader *websocket.Upgrader) gin.Handle
 		}
 	}
 }
-
-// ------------------------------
-// 使用示例
-// ------------------------------
-
-// 假设我们有这样一个 main 文件使用上述库：
-/*
-package main
-
-import (
-	"context"
-	"log"
-	"net/http"
-
-	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc"
-
-	"vaalacat/frp-panel/utils/wsgrpc"
-	"github.com/gorilla/websocket"
-)
-
-// 服务端实例
-func main() {
-	// 创建 WebSocket Listener，缓冲队列大小为 100，地址和网络标识可自定义
-	listener := wsgrpc.NewWSListener("ws-listener", "ws", 100)
-
-	// 在单独的 goroutine 中启动 gRPC Server
-	go func() {
-		grpcServer := grpc.NewServer()
-		// 在此注册你的 gRPC 服务…
-		if err := grpcServer.Serve(listener); err != nil {
-			log.Fatalf("gRPC server error: %v", err)
-		}
-	}()
-
-	// 使用 Gin 创建 HTTP 服务器，并在某个路径下提供 WebSocket 功能
-	router := gin.Default()
-
-	// 创建一个简单的 upgrader 实例；可根据需要自定义 CheckOrigin 等选项
-	upgrader := &websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
-	}
-
-	// 注册 WebSocket 处理 handler，路径可自定义，例如 /ws
-	router.GET("/ws", wsgrpc.GinWSHandler(listener, upgrader))
-
-	// 启动 HTTP 服务
-	if err := router.Run(":8080"); err != nil {
-		log.Fatalf("HTTP server error: %v", err)
-	}
-
-	// 示例中，当 HTTP 请求升级为 WebSocket 后，会将连接推入 listener，
-	// gRPC Server 的 Accept 就会获取到该 net.Conn 连接，实现 gRPC 请求的代理。
-}
-
-客户端示例：
-func main() {
-	// 定义 websocket 服务器地址和 header（如果有需要）
-	wsURL := "ws://127.0.0.1:8080/ws" // 示例地址
-	header := http.Header{}
-
-	// 创建 websocket dialer
-	dialer := wsgrpc.WebsocketDialer(wsURL, header)
-
-	// 使用 grpc.WithContextDialer 配置 GRPC Dial
-	conn, err := grpc.DialContext(context.Background(), "ignored",
-		grpc.WithContextDialer(dialer),
-		grpc.WithInsecure(), // 示例中禁用 TLS，生产环境建议使用安全连接
-	)
-	if err != nil {
-		log.Fatalf("failed to dial: %v", err)
-	}
-	defer conn.Close()
-
-	// 接下来可使用 conn 创建 GRPC 客户端进行调用
-}
-*/

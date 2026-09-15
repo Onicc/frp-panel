@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/VaalaCat/frp-panel/pb"
+	"github.com/Onicc/frp-panel/pb"
 	"github.com/samber/lo"
 )
 

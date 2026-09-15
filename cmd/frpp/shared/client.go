@@ -3,16 +3,16 @@ package shared
 import (
 	"context"
 
-	bizclient "github.com/VaalaCat/frp-panel/biz/client"
-	"github.com/VaalaCat/frp-panel/conf"
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/clientrpc"
-	"github.com/VaalaCat/frp-panel/services/rpc"
-	"github.com/VaalaCat/frp-panel/services/tunnel"
-	"github.com/VaalaCat/frp-panel/services/watcher"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	bizclient "github.com/Onicc/frp-panel/biz/client"
+	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/clientrpc"
+	"github.com/Onicc/frp-panel/services/rpc"
+	"github.com/Onicc/frp-panel/services/tunnel"
+	"github.com/Onicc/frp-panel/services/watcher"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/sourcegraph/conc"
 	"go.uber.org/fx"
 )
@@ -51,10 +51,12 @@ func runClient(param runClientParam) {
 		bizclient.PullConfig, appInstance, clientID, clientSecret)
 	param.TaskManager.AddDurationTask(defs.PullClientWorkersDuration,
 		bizclient.PullWorkers, appInstance, clientID, clientSecret)
-	param.TaskManager.AddDurationTask(defs.PullClientWireGuardsDuration,
-		bizclient.PullWireGuards, appInstance, clientID, clientSecret)
-	param.TaskManager.AddDurationTask(defs.ReportWireGuardRuntimeInfoDuration,
-		bizclient.ReportWireGuardRuntimeInfo, appInstance, clientID, clientSecret)
+	if appInstance.GetConfig().Client.Features.EnableWireGuard {
+		param.TaskManager.AddDurationTask(defs.PullClientWireGuardsDuration,
+			bizclient.PullWireGuards, appInstance, clientID, clientSecret)
+		param.TaskManager.AddDurationTask(defs.ReportWireGuardRuntimeInfoDuration,
+			bizclient.ReportWireGuardRuntimeInfo, appInstance, clientID, clientSecret)
+	}
 
 	var wg conc.WaitGroup
 	param.Lc.Append(fx.Hook{
@@ -76,7 +78,9 @@ func runClient(param runClientParam) {
 			// --- init once start ---
 			initClientOnce(appInstance, clientID, clientSecret)
 			initClientWorkerOnce(appInstance, clientID, clientSecret)
-			initClientWireGuardOnce(appInstance, clientID, clientSecret)
+			if appInstance.GetConfig().Client.Features.EnableWireGuard {
+				initClientWireGuardOnce(appInstance, clientID, clientSecret)
+			}
 			// --- init once stop ----
 
 			wg.Go(cliRpcHandler.Run)

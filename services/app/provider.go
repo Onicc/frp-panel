@@ -4,10 +4,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/utils"
-	"github.com/casbin/casbin/v2"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/utils"
 
 	"github.com/fatedier/frp/client/proxy"
 	v1 "github.com/fatedier/frp/pkg/config/v1"
@@ -155,18 +154,6 @@ type ServerHandler interface {
 // rpc/master.go
 type MasterClient interface {
 	Call() pb.MasterClient
-}
-
-// services/rbac/perm_manager.go
-type PermissionManager interface {
-	AddUserToGroup(userID int, groupID string, tenantID int) (bool, error)
-	CheckPermission(userID int, objType defs.RBACObj, objID string, action defs.RBACAction, tenantID int) (bool, error)
-	Enforcer() *casbin.Enforcer
-	GrantGroupPermission(groupID string, objType defs.RBACObj, objID string, action defs.RBACAction, tenantID int) (bool, error)
-	GrantUserPermission(userID int, objType defs.RBACObj, objID string, action defs.RBACAction, tenantID int) (bool, error)
-	RemoveUserFromGroup(userID int, groupID string, tenantID int) (bool, error)
-	RevokeGroupPermission(groupID string, objType defs.RBACObj, objID string, action defs.RBACAction, tenantID int) (bool, error)
-	RevokeUserPermission(userID int, objType defs.RBACObj, objID string, action defs.RBACAction, tenantID int) (bool, error)
 }
 
 // services/workerd/exec_manager.go

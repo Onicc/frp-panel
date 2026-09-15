@@ -4,13 +4,13 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/VaalaCat/frp-panel/conf"
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/server"
-	"github.com/VaalaCat/frp-panel/utils"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/server"
+	"github.com/Onicc/frp-panel/utils"
+	"github.com/Onicc/frp-panel/utils/logger"
 	v1 "github.com/fatedier/frp/pkg/config/v1"
 	"github.com/samber/lo"
 )
@@ -48,17 +48,22 @@ func PullConfig(appInstance app.Application, serverID, serverSecret string) erro
 	InjectAuthPlugin(ctx, s)
 
 	if t := ctrl.Get(serverID); t != nil {
-		if !reflect.DeepEqual(t.GetCommonCfg(), s) {
-			t.Stop()
-			ctrl.Delete(serverID)
-			logger.Logger(ctx).Infof("server %s config changed, will recreate it", serverID)
-		} else {
+		if reflect.DeepEqual(t.GetCommonCfg(), s) {
 			logger.Logger(ctx).Infof("server %s config not changed", serverID)
 			return nil
 		}
 	}
 
-	ctrl.Add(serverID, server.NewServerHandler(s))
+	handler, err := server.NewServerHandler(s)
+	if err != nil {
+		logger.Logger(ctx).WithError(err).Error("cannot stage server configuration")
+		return err
+	}
+	if old := ctrl.Get(serverID); old != nil {
+		ctrl.Delete(serverID)
+		logger.Logger(ctx).Infof("server %s config changed, staged replacement is ready", serverID)
+	}
+	ctrl.Add(serverID, handler)
 	ctrl.Run(serverID)
 
 	logger.Logger(ctx).Infof("pull server config success, serverID: [%s]", serverID)

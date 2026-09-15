@@ -6,8 +6,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
@@ -165,9 +165,4 @@ func normalizeEndpoint(ep *pb.Endpoint) string {
 	}
 
 	return addr.String()
-}
-
-func isZeroKey(key wgtypes.Key) bool {
-	var zero wgtypes.Key
-	return key == zero
 }

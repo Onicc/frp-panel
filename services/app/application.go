@@ -4,9 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/VaalaCat/frp-panel/conf"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/casbin/casbin/v2"
+	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/pb"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/credentials"
@@ -41,10 +40,6 @@ type Application interface {
 	SetRPCCred(credentials.TransportCredentials)
 	GetCurrentRole() string
 	SetCurrentRole(string)
-	GetEnforcer() *casbin.Enforcer
-	SetEnforcer(*casbin.Enforcer)
-	GetPermManager() PermissionManager
-	SetPermManager(PermissionManager)
 	GetWorkerExecManager() WorkerExecManager
 	SetWorkerExecManager(WorkerExecManager)
 	GetWorkersManager() WorkersManager

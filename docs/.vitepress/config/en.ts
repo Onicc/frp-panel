@@ -1,53 +1,24 @@
 import type { DefaultTheme, LocaleSpecificConfig } from "vitepress";
 
 export const enConfig: LocaleSpecificConfig<DefaultTheme.Config> = {
+  lang: "en-US",
+  title: "frp-panel v2",
+  description: "A secure, cross-platform FRP control plane",
   themeConfig: {
     nav: [
       { text: "Home", link: "/en/" },
-      { text: "Source Code", link: "https://github.com/vaalacat/frp-panel" },
+      { text: "Source", link: "https://github.com/Onicc/frp-panel" },
     ],
     sidebar: [
-      {
-        text: "Quick Start",
-        collapsed: false,
-        link: "/en/quick-start",
-        items: [
-          { text: "Master Deployment", link: "/en/deploy-master" },
-          { text: "Server Deployment", link: "/en/deploy-server" },
-          { text: "Client Deployment", link: "/en/deploy-client" },
-        ],
-      },
-      {
-        text: "Advanced Usage",
-        collapsed: false,
-        link: "/en/wireguard",
-        items: [
-          { text: "WireGuard Multi-Hop Networking", link: "/en/wireguard" },
-        ],
-      },
-      {
-        text: "Configuration",
-        collapsed: false,
-        link: "/en/all-configs",
-      },
-      {
-        text: "Contribution Guide",
-        collapsed: false,
-        link: "/en/contribute",
-      },
-      {
-        text: "FAQ",
-        collapsed: false,
-        link: "/en/faq",
-      },
-      {
-        text: "Screenshots",
-        collapsed: false,
-        link: "/en/screenshots",
-      },
+      { text: "Quick start", link: "/en/quick-start" },
+      { text: "Install the Agent", link: "/en/agent" },
+      { text: "Configuration", link: "/en/configuration" },
+      { text: "Architecture", link: "/ARCHITECTURE_V2" },
+      { text: "Optimization review", link: "/OPTIMIZATION" },
+      { text: "Platform support", link: "/SUPPORT_MATRIX" },
+      { text: "Security", link: "/SECURITY" },
+      { text: "API errors", link: "/api-problems" },
     ],
-    socialLinks: [
-      { icon: "github", link: "https://github.com/vaalacat/frp-panel" },
-    ],
+    socialLinks: [{ icon: "github", link: "https://github.com/Onicc/frp-panel" }],
   },
 };

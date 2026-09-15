@@ -35,17 +35,11 @@ func HandleStaticFile(f embed.FS, router *gin.Engine) {
 	router.NoRoute(func(c *gin.Context) {
 		if c.Request.Method == http.MethodGet &&
 			!strings.ContainsRune(c.Request.URL.Path, '.') &&
-			!strings.HasPrefix(c.Request.URL.Path, "/v1/") {
-			if strings.HasSuffix(c.Request.URL.Path, "/") {
-				c.Request.URL.Path += "index.html"
-				staticServer(c)
-				return
-			}
-			if !strings.HasSuffix(c.Request.URL.Path, ".html") {
-				c.Request.URL.Path += ".html"
-				staticServer(c)
-				return
-			}
+			!strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.Request.URL.Path = "/index.html"
+			staticServer(c)
+			return
 		}
+		c.Status(http.StatusNotFound)
 	})
 }

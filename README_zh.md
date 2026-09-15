@@ -1,65 +1,63 @@
-# FRP-Panel
+# frp-panel v2
 
-FRP-Panel 是一款基于 FRP 的可视化管理面板，提供中心化配置、统一凭证、动态调度和边缘 Worker 支持，让内网穿透和服务暴露更简单、更安全、更高效。
+面向 FRP 的开源控制面，包含安全的 Web 控制台与跨平台节点 Agent。
 
-[详细使用文档 (Wiki)](https://vaala.cat/frp-panel) | [Frp-panel Blog 开发记录](https://vaala.cat/posts/frp-panel-doc/) | [截图/视频展示](https://vaala.cat/frp-panel/screenshots) | QQ 群：830620423
+> v2 是全新版本，不迁移 v1 数据库，也不保留旧客户端 CLI 的兼容层。
 
-> [WireGuard 多跳智能组网功能开发笔记](https://vaala.cat/posts/frp-panel-with-wireguard/) 点开有好玩的 Demo 哦！
+## 主要变化
 
-中文文档 | [English](./README.md)
+- 控制器 `frp-panel` 与轻量节点程序 `frp-panel-agent` 分离发布。
+- Agent 支持 Linux、macOS、Windows 的 amd64/arm64 主流平台。
+- 安装命令写入系统规范目录，不再污染执行命令时的当前目录。
+- 使用 Vite 8 / React 19 重写中英文控制台；创建、编辑成功后统一关闭并重置弹窗，失败时保留现场。
+- 安全默认值：校验 TLS、关闭高权限功能、Argon2id 密码、按角色签发权限、同源 WebSocket、0600 Agent 配置。
+- 发布 `onicc/frp-panel` 与 `onicc/frp-panel-agent` 两个多架构镜像。
+- 发布物包含 SHA-256、SBOM、GitHub provenance，Actions 均固定到提交 SHA。
 
-<div align="center">
-<a href="https://trendshift.io/repositories/7147" target="_blank"><img src="https://trendshift.io/api/badge/repositories/7147" alt="VaalaCat%2Ffrp-panel | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</div>
+## 运行控制器
 
+先生成随机密钥：
 
-## 核心优势
+```bash
+export APP_GLOBAL_SECRET="$(openssl rand -hex 32)"
+export PUBLIC_HOST="panel.example.com"
+export APP_ENABLE_REGISTER=true
+docker compose up -d
+```
 
-| 优势                       | 描述                                                         |
-|:--------------------------|:------------------------------------------------------------|
-| 中央化配置                 | 所有客户端/服务端配置由 Master 管理，无需手动编辑 JSON 文件          |
-| 多节点统一管理             | 支持任意数量的 frpc（客户端）与 frps（服务端）节点集中监控与调度     |
-| 可视化界面                 | Web UI 一键创建、编辑、监控隧道和Worker，实时日志与统计一目了然                  |
-| 简化凭证分发               | 自动生成并分发启动命令，无须手动传参             |
-| 边缘 Worker 自部署         | 在 Client 上部署自定义 Worker，Server 将其暴露到公网，Master 可实时调整配置 |
-| WireGuard 智能组网         | 支持 Client 相互之间使用 WireGuard over UDP/Websocket 多跳组网、自定义路由、拓扑，按延迟和带宽智能计算最短路由 |
+在 Web 控制台创建初始 Owner 后，将 `APP_ENABLE_REGISTER=false` 并再次执行 `docker compose up -d`。Web/API 端口为 `9000`，Agent RPC 为 `9001`，内置默认 FRPS 为 `7000`。生产环境应在 Web 入口前配置 HTTPS，并保持 `APP_COOKIE_SECURE=true`。
 
-> 组网功能目前处于测试阶段，可能存在一些问题，欢迎反馈
+## 安装 Agent
 
-## 架构概览
+在 **节点 → 添加节点** 中生成 10 分钟有效的注册命令，选择对应系统后复制。安装位置如下：
 
-![arch](docs/public/images/arch.png)
+| 系统 | 程序 | 配置与数据 |
+|---|---|---|
+| Linux | `/usr/local/libexec/frp-panel/frp-panel-agent` | `/etc/frp-panel/agent.yaml`、`/var/lib/frp-panel` |
+| macOS | `/usr/local/libexec/frp-panel/frp-panel-agent` | `/Library/Application Support/frp-panel` |
+| Windows | `%ProgramFiles%\frp-panel\frp-panel-agent.exe` | `%ProgramData%\frp-panel` |
 
-1. **Master** – 集中管理与鉴权，要求所有 Server 和 Client 可访问；
-2. **Server** – 承载业务流量，作为公网入口，为 Client 提供服务；
-3. **Client** – 内网代理，支持部署 Worker，支持 WireGuard 与其他 Client 智能组网；
+系统服务名为 `frp-panel-agent`。可使用 `service status/restart/uninstall --purge` 管理服务，使用 `doctor --json` 检查能力与配置。
 
-> 组网目前要求网络中至少有一个 Client 有公网IP作为中继节点，且目前仅支持 Linux 操作系统组网
+## 开发与测试
 
-## 社区与赞助
+需要 Go 1.27.1 与 Node.js 24 LTS。
 
-本项目完全开源，欢迎 Star、Issues、PR。
-若 FRP-Panel 为您带来价值，欢迎赞助作者：
+```bash
+corepack enable
+cd www && pnpm install --frozen-lockfile && pnpm build && cd ..
+go test ./...
+go build ./cmd/frpp ./cmd/frp-panel-agent
+```
 
--  邮箱：me@vaala.cat
+进一步阅读：[v2 架构](docs/ARCHITECTURE_V2.md)、[优化审查](docs/OPTIMIZATION.md)、[支持矩阵](docs/SUPPORT_MATRIX.md)、[安全审查](docs/SECURITY.md)、[OpenAPI](api/openapi.yaml)。
 
-[NodeSupport](https://github.com/NodeSeekDev/NodeSupport) / [林枫云](https://www.dkdun.cn) 赞助了该项目
+## 发布规则
 
-<div align="left">
-  <a href="https://yxvm.com/">
-    <img src="https://github.com/user-attachments/assets/0bd7087a-7994-4caf-a465-a428af19c5aa" width="300" />
-  </a>
-</div>
-<div align="left">
-  <a href="https://www.dkdun.cn">
-    <img src="https://www.dkdun.cn/themes/web/www/upload/local68c2dbb2ab148.png" width="300" />
-  </a>
-</div>
+- `main` 通过测试后更新 GitHub `edge` 发布及两个 Docker 镜像的 `edge` 标签。
+- `v*` 标签生成稳定 GitHub Release，并发布对应版本与 `latest` 镜像。
+- 发布物带校验和、SBOM 与 GitHub 构建证明；目前不提供 Apple 公证及 Windows Authenticode。
 
-## 项目状态
+## 开源协议与署名
 
-[![Star History](https://api.star-history.com/svg?repos=vaalacat/frp-panel&type=Date)](https://www.star-history.com/#vaalacat/frp-panel&Date)
-
----
-
-*更多部署、使用与配置细节，请移步 Wiki → [FRP-Panel WiKi](https://vaala.cat/frp-panel)*
+项目使用 AGPL-3.0，由 Onicc 维护，派生自 [VaalaCat/frp-panel](https://github.com/VaalaCat/frp-panel)。详见 [NOTICE](NOTICE)。

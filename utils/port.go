@@ -16,7 +16,10 @@ func GetFreePort(network string) (uint32, error) {
 		err  error
 	)
 
-	addr := ":0" // let OS choose
+	addr := "127.0.0.1:0"
+	if strings.HasSuffix(network, "6") {
+		addr = "[::1]:0"
+	}
 	switch network {
 	case "tcp4", "tcp6":
 		var ln net.Listener
@@ -42,6 +45,9 @@ func GetFreePort(network string) (uint32, error) {
 
 	if err != nil {
 		return 0, err
+	}
+	if port < 1 || port > 65535 {
+		return 0, fmt.Errorf("invalid allocated port %d", port)
 	}
 	return uint32(port), nil
 }

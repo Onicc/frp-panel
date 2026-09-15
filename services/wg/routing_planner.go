@@ -4,14 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net/netip"
 	"sort"
 	"time"
 
 	"github.com/samber/lo"
 
-	"github.com/VaalaCat/frp-panel/models"
-	"github.com/VaalaCat/frp-panel/pb"
+	"github.com/Onicc/frp-panel/models"
+	"github.com/Onicc/frp-panel/pb"
 )
 
 // WireGuard 的 AllowedIPs 同时承担两件事：
@@ -674,15 +673,6 @@ func findNextHop(src, dst uint, prev map[uint]uint) uint {
 		}
 		next = p
 	}
-}
-
-// 仅用于测试/诊断：解析 /32 的 host ip（校验格式）
-func parseHostFromCIDR(c string) (netip.Addr, bool) {
-	p, err := netip.ParsePrefix(c)
-	if err != nil {
-		return netip.Addr{}, false
-	}
-	return p.Addr(), true
 }
 
 // getHandshakeAgeBetween 返回 a<->b 间 peer handshake 的“最大”年龄（只要任意一侧可观测到握手时间就生效）。

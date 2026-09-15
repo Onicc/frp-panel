@@ -4,11 +4,12 @@ import (
 	"context"
 	"sync"
 
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils/logger"
 	v1 "github.com/fatedier/frp/pkg/config/v1"
 	"github.com/fatedier/frp/pkg/config/v1/validation"
 	"github.com/fatedier/frp/pkg/metrics/mem"
+	"github.com/fatedier/frp/pkg/policy/security"
 	"github.com/fatedier/frp/server"
 	"github.com/sourcegraph/conc"
 )
@@ -19,22 +20,24 @@ type serverImpl struct {
 	firstSync sync.Once
 }
 
-func NewServerHandler(svrCfg *v1.ServerConfig) app.ServerHandler {
-	svrCfg.Complete()
+func NewServerHandler(svrCfg *v1.ServerConfig) (app.ServerHandler, error) {
+	if err := svrCfg.Complete(); err != nil {
+		return nil, err
+	}
 	ctx := context.Background()
 
-	warning, err := validation.ValidateServerConfig(svrCfg)
+	warning, err := validation.NewConfigValidator(security.NewUnsafeFeatures(nil)).ValidateServerConfig(svrCfg)
 	if warning != nil {
 		logger.Logger(ctx).WithError(err).Warnf("validate server config warning: %+v", warning)
 	}
 	if err != nil {
-		logger.Logger(ctx).Panic(err)
+		return nil, err
 	}
 
 	var svr *server.Service
 
 	if svr, err = server.NewService(svrCfg); err != nil {
-		logger.Logger(ctx).WithError(err).Panic("cannot create server, exit and restart")
+		return nil, err
 	}
 
 	logger.Logger(ctx).Debugf("create server, config is: [ %+v ]", svrCfg)
@@ -43,7 +46,7 @@ func NewServerHandler(svrCfg *v1.ServerConfig) app.ServerHandler {
 		srv:       svr,
 		Common:    svrCfg,
 		firstSync: sync.Once{},
-	}
+	}, nil
 }
 
 func (s *serverImpl) Run() {

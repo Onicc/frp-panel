@@ -3,12 +3,12 @@ package client
 import (
 	"strings"
 
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/models"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/dao"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/models"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/samber/lo"
 )
 
@@ -50,7 +50,6 @@ func GetClientHandler(ctx *app.Context, req *pb.GetClientRequest) (*pb.GetClient
 
 		respCli = &pb.Client{
 			Id:        lo.ToPtr(client.ClientID),
-			Secret:    lo.ToPtr(client.ConnectSecret),
 			Config:    lo.ToPtr(string(client.ConfigContent)),
 			ServerId:  lo.ToPtr(client.ServerID),
 			Stopped:   lo.ToPtr(client.Stopped),
@@ -76,7 +75,6 @@ func GetClientHandler(ctx *app.Context, req *pb.GetClientRequest) (*pb.GetClient
 
 		respCli = &pb.Client{
 			Id:        lo.ToPtr(client.ClientID),
-			Secret:    lo.ToPtr(client.ConnectSecret),
 			Config:    lo.ToPtr(string(client.ConfigContent)),
 			ServerId:  lo.ToPtr(client.ServerID),
 			Stopped:   lo.ToPtr(client.Stopped),

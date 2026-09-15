@@ -49,7 +49,9 @@ func LoadClientConfigNormal(content []byte, strict bool) (*v1.ClientConfig, erro
 		return nil, err
 	}
 	cliCfg = &allCfg.ClientCommonConfig
-	cliCfg.Complete()
+	if err := cliCfg.Complete(); err != nil {
+		return nil, err
+	}
 	allCfg.ClientCommonConfig = *cliCfg
 	return &allCfg, nil
 }
@@ -89,13 +91,15 @@ func LoadClientConfig(content []byte, strict bool) (
 		})
 	}
 
-	cliCfg.Complete()
+	if err := cliCfg.Complete(); err != nil {
+		return nil, nil, nil, err
+	}
 
 	for _, c := range proxyCfgs {
-		c.Complete(cliCfg.User)
+		c.Complete()
 	}
 	for _, c := range visitorCfgs {
-		c.Complete(cliCfg)
+		c.Complete()
 	}
 	return cliCfg, proxyCfgs, visitorCfgs, nil
 }
@@ -108,7 +112,9 @@ func LoadServerConfig(content []byte, strict bool) (*v1.ServerConfig, error) {
 		return nil, err
 	}
 
-	svrCfg.Complete()
+	if err := svrCfg.Complete(); err != nil {
+		return nil, err
+	}
 
 	return svrCfg, nil
 }

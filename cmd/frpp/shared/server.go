@@ -3,16 +3,16 @@ package shared
 import (
 	"context"
 
-	bizserver "github.com/VaalaCat/frp-panel/biz/server"
-	"github.com/VaalaCat/frp-panel/conf"
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/clientrpc"
-	"github.com/VaalaCat/frp-panel/services/rpc"
-	"github.com/VaalaCat/frp-panel/services/tunnel"
-	"github.com/VaalaCat/frp-panel/services/watcher"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	bizserver "github.com/Onicc/frp-panel/biz/server"
+	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/clientrpc"
+	"github.com/Onicc/frp-panel/services/rpc"
+	"github.com/Onicc/frp-panel/services/tunnel"
+	"github.com/Onicc/frp-panel/services/watcher"
+	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/sourcegraph/conc"
 	"go.uber.org/fx"
 )
@@ -66,7 +66,9 @@ func runServer(param runServerParam) {
 			appInstance.SetClientRPCHandler(cliHandler)
 			appInstance.SetServerController(tunnel.NewServerController())
 
-			go initServerOnce(appInstance, clientID, clientSecret)
+			// This startup probe belongs to the process lifecycle, not the short-lived
+			// fx OnStart context.
+			go initServerOnce(appInstance, clientID, clientSecret) // #nosec G118
 			wg.Go(cliHandler.Run)
 			wg.Go(param.TaskManager.Run)
 			wg.Go(param.ServerApiService.Run)

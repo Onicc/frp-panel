@@ -6,7 +6,12 @@ tmp
 frp-panel
 out
 cmd/out
-frp-panel*
+# The controller embeds the Vite production bundle. Keep only that generated
+# output in version control so a clean Go checkout remains buildable.
+!cmd/frpp/out/
+!cmd/frpp/out/**
+/frp-panel
+/frp-panel-agent
 dist/
 
 /coverage

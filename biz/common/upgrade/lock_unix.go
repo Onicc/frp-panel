@@ -38,5 +38,3 @@ func lock(workDir string) (unlockFn, error) {
 		_ = f.Close()
 	}, nil
 }
-
-

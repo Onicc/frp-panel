@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/VaalaCat/frp-panel/defs"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/utils/logger"
+	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils/logger"
 )
 
 var _ app.WorkerController = (*workerdController)(nil)
@@ -56,7 +56,7 @@ func (w *workerdController) Init(c *app.Context) error {
 	workerCodePath := WorkerCodeRootPath(c, w.worker, w.workerdCwd)
 
 	// 1. 创建工作目录
-	if err := os.MkdirAll(workerCodePath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(workerCodePath, 0o750); err != nil {
 		logger.Logger(c).WithError(err).Errorf("create work dir failed, path: [%s]", workerCodePath)
 		return err
 	}

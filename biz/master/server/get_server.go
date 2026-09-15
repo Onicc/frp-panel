@@ -1,10 +1,10 @@
 package server
 
 import (
-	"github.com/VaalaCat/frp-panel/common"
-	"github.com/VaalaCat/frp-panel/pb"
-	"github.com/VaalaCat/frp-panel/services/app"
-	"github.com/VaalaCat/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/common"
+	"github.com/Onicc/frp-panel/pb"
+	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/dao"
 	"github.com/samber/lo"
 )
 
@@ -36,7 +36,6 @@ func GetServerHandler(c *app.Context, req *pb.GetServerRequest) (*pb.GetServerRe
 		Server: &pb.Server{
 			Id:       lo.ToPtr(serverEntity.ServerID),
 			Config:   lo.ToPtr(string(serverEntity.ConfigContent)),
-			Secret:   lo.ToPtr(serverEntity.ConnectSecret),
 			Comment:  lo.ToPtr(serverEntity.Comment),
 			Ip:       lo.ToPtr(serverEntity.ServerIP),
 			FrpsUrls: serverEntity.FrpsUrls,

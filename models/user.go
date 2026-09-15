@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/VaalaCat/frp-panel/defs"
+	"github.com/Onicc/frp-panel/defs"
 	"gorm.io/gorm"
 )
 
@@ -32,12 +32,12 @@ var _ UserInfo = (*UserEntity)(nil)
 type UserEntity struct {
 	UserID    int    `json:"user_id" gorm:"primaryKey"`
 	UserName  string `json:"user_name" gorm:"type:varchar(255);uniqueIndex;not null"`
-	Password  string `json:"password"`
+	Password  string `json:"-"`
 	Email     string `json:"email" gorm:"type:varchar(255);uniqueIndex;not null"`
 	Status    int    `json:"status"`
 	Role      string `json:"role"`
 	TenantID  int    `json:"tenant_id"`
-	Token     string `json:"token"`
+	Token     string `json:"-"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
