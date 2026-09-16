@@ -42,15 +42,7 @@ func UpdateUserInfoHander(c *app.Context, req *pb.UpdateUserInfoRequest) (*pb.Up
 	}
 
 	if newUserInfo.GetRawPassword() != "" {
-		if len(newUserInfo.GetRawPassword()) < 12 {
-			return &pb.UpdateUserInfoResponse{Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: "password must contain at least 12 characters"}}, nil
-		}
-		hashedPassword, err := utils.HashPassword(newUserInfo.GetRawPassword())
-		if err != nil {
-			logger.Logger(context.Background()).WithError(err).Errorf("cannot hash password")
-			return nil, err
-		}
-		newUserEntity.Password = hashedPassword
+		return &pb.UpdateUserInfoResponse{Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: "use the password endpoint and provide the current password"}}, nil
 	}
 
 	if newUserInfo.GetUserName() != "" {

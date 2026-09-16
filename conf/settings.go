@@ -2,7 +2,6 @@ package conf
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -14,11 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"
-	"github.com/tidwall/pretty"
 )
 
 type Config struct {
-	PublicURL string `env:"PUBLIC_URL" env-description:"single public http(s) URL used by the controller and managed components"`
+	PublicURL string `env:"PUBLIC_URL" env-description:"single public http(s) URL used by Master and managed components"`
 	App       struct {
 		UseGvisorNet   bool   `env:"USE_GVISOR_NET" env-default:"false" env-description:"use gvisor netstack for TUN device"`
 		GlobalSecret   string `env:"GLOBAL_SECRET" env-description:"at least 32 random characters; used to derive signing keys"`
@@ -121,8 +119,8 @@ func NewConfig() Config {
 }
 
 // DefaultConfig provides the same safe defaults without reading process
-// environment or files. The Agent uses it so controller-side .env files cannot
-// leak into a node runtime started from an arbitrary working directory.
+// environment or files. The Client Agent uses it so Master-side .env files cannot
+// leak into a Client Agent runtime started from an arbitrary working directory.
 func DefaultConfig() Config {
 	var cfg Config
 	cfg.App.CookieAge = 86400
@@ -205,20 +203,4 @@ func (cfg *Config) applyPublicURL() error {
 	}
 	cfg.Client.RPCUrl = strings.TrimRight(parsed.String(), "/")
 	return nil
-}
-
-func (cfg Config) PrintStr() string {
-	redacted := cfg
-	redacted.App.GlobalSecret = "[redacted]"
-	redacted.Client.Secret = "[redacted]"
-	redacted.HTTP_PROXY = redactURL(redacted.HTTP_PROXY)
-	raw, _ := json.Marshal(redacted)
-	return string(pretty.Pretty(raw))
-}
-
-func redactURL(value string) string {
-	if value == "" {
-		return ""
-	}
-	return "[redacted]"
 }

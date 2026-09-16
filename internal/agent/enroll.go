@@ -13,14 +13,14 @@ import (
 )
 
 type EnrollmentResult struct {
-	NodeID string `json:"nodeId"`
-	Secret string `json:"secret"`
+	ClientID string `json:"clientId"`
+	Secret   string `json:"secret"`
 }
 
 func Enroll(apiURL, token string, insecureSkipVerify bool) (EnrollmentResult, error) {
 	base, err := url.Parse(apiURL)
 	if err != nil || (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" {
-		return EnrollmentResult{}, fmt.Errorf("invalid controller API URL")
+		return EnrollmentResult{}, fmt.Errorf("invalid Master API URL")
 	}
 	base.Path = strings.TrimRight(base.Path, "/") + "/api/v2/agent/enroll"
 	base.RawQuery = ""
@@ -61,8 +61,8 @@ func Enroll(apiURL, token string, insecureSkipVerify bool) (EnrollmentResult, er
 	if err := json.Unmarshal(raw, &result); err != nil {
 		return EnrollmentResult{}, fmt.Errorf("decode enrollment response: %w", err)
 	}
-	if result.NodeID == "" || result.Secret == "" {
-		return EnrollmentResult{}, fmt.Errorf("controller returned incomplete enrollment credentials")
+	if result.ClientID == "" || result.Secret == "" {
+		return EnrollmentResult{}, fmt.Errorf("Master returned incomplete enrollment credentials")
 	}
 	return result, nil
 }

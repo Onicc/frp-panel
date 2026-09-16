@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "frp-panel v2"
   text: "A secure, cross-platform FRP control plane"
-  tagline: Linux controller with Linux, macOS, and Windows node Agents
+  tagline: Linux Master with Linux, macOS, and Windows Client Agents
   actions:
     - theme: brand
       text: Deployment guide

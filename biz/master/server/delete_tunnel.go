@@ -12,7 +12,7 @@ import (
 )
 
 func RemoveFrpsHandler(c *app.Context, req *pb.RemoveFRPSRequest) (*pb.RemoveFRPSResponse, error) {
-	logger.Logger(c).Infof("remove frps, req: [%+v]", req)
+	logger.Logger(c).Infof("remove Server runtime, server: [%s]", req.GetServerId())
 
 	var (
 		serverID = req.GetServerId()

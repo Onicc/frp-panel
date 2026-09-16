@@ -1,8 +1,8 @@
 # Client / Agent installation and maintenance
 
-The console-generated bootstrap downloads into a temporary directory, verifies SHA-256, then atomically installs the Agent into an OS-owned location. The service command contains only a config path; mode `0600` protects node credentials.
+The console-generated bootstrap downloads into a temporary directory, verifies SHA-256, then atomically installs the Client Agent into an OS-owned location. The service command contains only a config path; mode `0600` protects Client credentials.
 
-Create the enrollment command under **Nodes → Add node**, select Linux, macOS, or Windows, and run the complete copied command on the target machine. Do not assemble an enrollment command from this page: its one-time token is valid for ten minutes and expires after its first successful redemption.
+Create the enrollment command under **Clients → Add Client**, select Linux, macOS, or Windows, and run the complete copied command on the target Client host. Do not assemble an enrollment command from this page: its one-time token is valid for ten minutes and expires after its first successful redemption.
 
 | OS | Binary | Configuration and state | Service manager |
 |---|---|---|---|
@@ -44,16 +44,16 @@ Restart-Service frp-panel-agent
 
 ## Recovering a failed Linux installation
 
-The enrollment token is redeemed before the service starts. If the command wrote `/etc/frp-panel/agent.yaml` and then failed while installing or starting systemd, keep that file and rerun the original installation command. When the token cannot be redeemed again, the installer reuses the protected configuration only if both its node ID and Master endpoints match. If the original command is no longer available, repair the installation from the existing configuration:
+The enrollment token is redeemed before the service starts. If the command wrote `/etc/frp-panel/agent.yaml` and then failed while installing or starting systemd, keep that file and rerun the original installation command. When the token cannot be redeemed again, the installer reuses the protected configuration only if both its Client ID and Master endpoints match. If the original command is no longer available, repair the installation from the existing configuration:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Onicc/frp-panel/main/install.sh | sudo bash -s -- --config /etc/frp-panel/agent.yaml
 ```
 
-Do not run `uninstall --purge` first. Purging removes the node credential, so a new node and installation command must then be created in Master.
+Do not run `uninstall --purge` first. Purging removes the Client credential, so a new Client and installation command must then be created in Master.
 
 Apple notarization and Windows Authenticode are not provided yet. Verify downloads against `checksums.txt` from the GitHub Release before stable deployments.
 
 The bootstrap and `update` default to the rolling `edge` release. Production should pass an evaluated `v*` tag explicitly, or use `--version latest` for the latest stable release.
 
-See the [deployment guide](/en/deployment) for the complete Master, independent Server, Client, and route-assignment rollout.
+See the [deployment guide](/en/deployment) for the complete Master, independent Server, Client, and Tunnel rollout.

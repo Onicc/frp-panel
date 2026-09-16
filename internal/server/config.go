@@ -9,19 +9,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const ConfigVersion = 1
+const ConfigVersion = 2
 
 // Config is persisted on the FRPS host after a one-time enrollment. Keeping
 // the permanent credential in a mode-0600 volume file avoids exposing it in a
-// Compose file, process arguments, or the controller database.
+// Compose file, process arguments, or the Master database.
 type Config struct {
 	Version     int         `yaml:"version"`
-	Controller  Controller  `yaml:"controller"`
+	Master      Master      `yaml:"master"`
 	Credentials Credentials `yaml:"credentials"`
 	TLS         TLS         `yaml:"tls"`
 }
 
-type Controller struct {
+type Master struct {
 	APIURL string `yaml:"api_url"`
 	RPCURL string `yaml:"rpc_url"`
 }
@@ -39,8 +39,8 @@ func (c Config) Validate() error {
 	if c.Version != ConfigVersion {
 		return fmt.Errorf("unsupported server config version %d", c.Version)
 	}
-	if c.Controller.APIURL == "" || c.Controller.RPCURL == "" {
-		return errors.New("controller.api_url and controller.rpc_url are required")
+	if c.Master.APIURL == "" || c.Master.RPCURL == "" {
+		return errors.New("master.api_url and master.rpc_url are required")
 	}
 	if c.Credentials.ServerID == "" || c.Credentials.Secret == "" {
 		return errors.New("credentials.server_id and credentials.secret are required")

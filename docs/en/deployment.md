@@ -6,11 +6,11 @@
 |---|---:|---|---|
 | Master | 1 | Web console, API, identity, configuration, and connection orchestration; it carries no proxy traffic | Docker Compose |
 | Server (FRPS) | 1 or more | Public data-plane entry points for FRPC and tunnel traffic | Docker Compose on every Server host |
-| Client (FRPC) | 1 or more | Agent and managed FRPC on a node that exposes services | Console-generated OS installation command |
+| Client (FRPC) | 1 or more | Workload host running the Client Agent and managed FRPC | Console-generated OS installation command |
 
-One Master manages every Server and Client. A Client may be assigned one or more Server routes from the console; Master delivers a separate managed FRPC configuration for each route.
+One Master manages every Server, Client, and Tunnel. A Client is the physical workload host; the Agent is its management process. Every Tunnel directly selects one Client and one Server. Master creates the underlying FRPC connection on demand, and Tunnels for the same Client and Server share it.
 
-Deploy in this order: **Master → Server → Client → assign routes**.
+Deploy in this order: **Master → Server → Client → Tunnel**.
 
 ## 2. Deploy the single Master
 
@@ -27,7 +27,7 @@ services:
       APP_GLOBAL_SECRET: ${APP_GLOBAL_SECRET:?set a random 32+ character secret}
       APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-true}
       APP_ENABLE_REGISTER: ${APP_ENABLE_REGISTER:-false}
-      PUBLIC_URL: ${PUBLIC_URL:?set the single public controller URL, for example https://panel.example.com}
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
     ports:
       - "127.0.0.1:9000:9000"
     volumes:
@@ -62,13 +62,13 @@ PUBLIC_URL=https://panel.example.com
 
 Master does not publish port `7000` or any tunnel remote port.
 
-The first visit to `PUBLIC_URL` automatically shows **Create the first owner account**. Enter the username, email, password, and confirmation; the console signs in automatically and uses standard browser password-manager fields. After confirming that the account can sign in again, set `APP_ENABLE_REGISTER=false` and re-apply the Compose configuration.
+The first visit to `PUBLIC_URL` automatically shows **Create the first owner account**. Enter the username, email, password, and confirmation; the console signs in automatically and uses standard browser password-manager fields. After confirming that the account can sign in again, set `APP_ENABLE_REGISTER=false` and re-apply the Compose configuration. Use **Account settings** in the top-right corner to change the password; Master verifies the current password and requires a new sign-in after a successful change.
 
 ## 3. Deploy one or more Servers (FRPS)
 
 Each FRPS is an independent data plane on the Linux host that receives public traffic:
 
-1. Open **Servers → Create server** in Master.
+1. Open **Servers → Create Server** in Master.
 2. Enter a unique ID, the public DNS name/IP used by FRPC, and the FRPS bind port (`7000` by default).
 3. The successful dialog closes and the page displays a complete Server-specific `compose.yaml`.
 4. Save it on the target Server host and apply it. The first start redeems a ten-minute one-use token and stores the permanent credential in `/data/server.yaml` inside the named volume.
@@ -76,7 +76,7 @@ Each FRPS is an independent data plane on the Linux host that receives public tr
 
 Never reuse one generated file or Server data volume on multiple machines. If the token expires before the volume is initialized, create the same ID again to replace that not-yet-enrolled record.
 
-The generated file has this structure; the console replaces every placeholder:
+The generated file has this structure. Master inserts its configured `PUBLIC_URL` and the one-use token automatically, so the domain is not configured again:
 
 ```yaml
 services:
@@ -89,7 +89,7 @@ services:
       - --config
       - /data/server.yaml
     environment:
-      PUBLIC_URL: "https://panel.example.com"
+      PUBLIC_URL: "MASTER_PUBLIC_URL_INSERTED_BY_CONSOLE"
       SERVER_ENROLLMENT_TOKEN: "ONE_TIME_TOKEN_FROM_MASTER"
     volumes:
       - frp-panel-server-data:/data
@@ -100,45 +100,16 @@ volumes:
 
 Linux host networking lets FRPS accept new TCP/UDP remote ports without changing container port mappings. Restrict the host firewall and cloud security group to the FRPS bind port and the exact remote ports required by tunnels. The internal authentication API listens only on `127.0.0.1:8999` and must not be exposed.
 
-For manual maintenance, this is the equivalent environment-based template.
-
-### compose.yaml
-
-```yaml
-services:
-  frps:
-    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:edge}
-    restart: unless-stopped
-    network_mode: host
-    command: ["server", "--config", "/data/server.yaml"]
-    environment:
-      SERVER_ENROLLMENT_TOKEN: ${SERVER_ENROLLMENT_TOKEN:-}
-      PUBLIC_URL: ${PUBLIC_URL:?set the single public Master URL}
-    volumes:
-      - frp-panel-server-data:/data
-
-volumes:
-  frp-panel-server-data:
-```
-
-### .env
-
-```dotenv
-FRP_PANEL_IMAGE=onicc/frp-panel:edge
-SERVER_ENROLLMENT_TOKEN=ONE_TIME_TOKEN_FROM_MASTER
-PUBLIC_URL=https://panel.example.com
-```
-
-After the first successful enrollment, remove `SERVER_ENROLLMENT_TOKEN` from `.env`; restarts use the protected volume credential.
+Always use the file generated by the console; do not copy the Master's `.env` to a Server. After the first successful enrollment, restarts use the protected volume credential.
 
 ## 4. Install one or more Clients (FRPC)
 
 Do not hand-write a Client Compose file or command:
 
-1. Open **Nodes → Add node** in Master and enter a unique node ID.
+1. Open **Clients → Add Client** in Master and enter a unique Client ID.
 2. Select Linux, macOS, or Windows and copy the complete generated command.
-3. Run it with administrator privileges on the target node. It installs the binary, protected configuration, and native service in system locations, never in the command's current directory.
-4. Wait for the node to become online. Generate a separate command for every Client.
+3. Run it with administrator privileges on the target Client host. It installs the Client Agent, protected configuration, and native service in system locations, never in the command's current directory.
+4. Wait for the Client Agent to become online. Generate a separate command for every Client.
 
 | OS | Binary | Configuration and state |
 |---|---|---|
@@ -148,17 +119,17 @@ Do not hand-write a Client Compose file or command:
 
 See [Client / Agent operations](/en/agent) for service management, upgrade, and uninstall details.
 
-## 5. Assign FRPC routes in Master
+## 5. Create Tunnels and select Servers
 
-A newly installed Client does not connect to FRPS until Master assigns a route:
+A newly installed Client needs no preassigned Server. Open **Tunnels → Create Tunnel**:
 
-1. On **Nodes**, select a Server in the node's **FRPS routes** column and add it.
-2. Add more Servers when one physical Agent must run multiple independent FRPC routes.
-3. Remove an unused route in the same column. An online Agent applies changes immediately; changes made while offline apply no later than the next configuration sync.
+1. Select the Client that can reach the local service.
+2. Select the Server that provides the public entry point.
+3. Enter TCP/UDP, local address, local port, and public port, then confirm.
 
-The mapping is explicit per node and Server. Different Clients can use different FRPS hosts, one Client can use multiple FRPS hosts, and business traffic never passes through Master.
+A Client may own multiple Tunnels and every Tunnel may use a different Server. Master creates a connection for the first Tunnel using a Client and Server pair, shares it with later Tunnels for that pair, and removes it after the last Tunnel is deleted. The underlying Client-to-Server connection is not a separate user-managed resource.
 
-After assigning a route, open **Tunnels → Create tunnel**, select that node and Server, then enter the TCP/UDP protocol, local address, local port, and public port. The public port listens on the selected FRPS and forwards to the service reachable from the Client host.
+The public port listens on the selected Server (FRPS) and forwards to the service reachable by the selected Client. Business traffic never passes through Master. Configuration created while a Client is offline is synchronized when its Agent reconnects.
 
 ## 6. Ports and acceptance
 
@@ -171,6 +142,6 @@ After assigning a route, open **Tunnels → Create tunnel**, select that node an
 | Every Server | tunnel remote ports | Public TCP/UDP business ingress |
 | Every Server | `8999/tcp` | Loopback-only authentication API |
 
-Verify that Master health is available at `/api/v2/health`, registration is closed, every FRPS and Agent is online, and each node shows the intended FRPS routes. Back up the Master `frp-panel-data` volume, every Server `frp-panel-server-data` volume, and the Master `.env`. Preserve the original `APP_GLOBAL_SECRET` during restore.
+Verify that Master health is available at `/api/v2/health`, registration is closed, every Server and Client Agent is online, and every Tunnel shows the intended Client, Server, and ports. Back up the Master `frp-panel-data` volume, every Server `frp-panel-server-data` volume, and the Master `.env`. Preserve the original `APP_GLOBAL_SECRET` during restore.
 
 Review the [security baseline](/SECURITY), [configuration reference](/en/configuration), and [support matrix](/SUPPORT_MATRIX) before production use.

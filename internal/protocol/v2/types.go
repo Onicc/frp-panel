@@ -10,7 +10,7 @@ const Version = "2"
 
 type Hello struct {
 	Protocol     string       `json:"protocol"`
-	NodeID       string       `json:"nodeId"`
+	ClientID     string       `json:"clientId"`
 	AgentVersion string       `json:"agentVersion"`
 	Capabilities Capabilities `json:"capabilities"`
 }
@@ -61,8 +61,8 @@ func (h Hello) Validate() error {
 	if h.Protocol != Version {
 		return errors.New("unsupported agent protocol")
 	}
-	if h.NodeID == "" || h.AgentVersion == "" {
-		return errors.New("nodeId and agentVersion are required")
+	if h.ClientID == "" || h.AgentVersion == "" {
+		return errors.New("clientId and agentVersion are required")
 	}
 	return nil
 }

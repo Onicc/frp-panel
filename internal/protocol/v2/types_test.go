@@ -10,7 +10,7 @@ func TestDesiredStateRevision(t *testing.T) {
 }
 
 func TestHelloRequiresVersionAndIdentity(t *testing.T) {
-	if err := (Hello{Protocol: Version, NodeID: "node-1", AgentVersion: "v2"}).Validate(); err != nil {
+	if err := (Hello{Protocol: Version, ClientID: "client-1", AgentVersion: "v2"}).Validate(); err != nil {
 		t.Fatal(err)
 	}
 	if err := (Hello{Protocol: "1"}).Validate(); err == nil {

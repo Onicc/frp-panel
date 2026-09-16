@@ -1,4 +1,4 @@
-.PHONY: web docs test security cross build controller agent clean
+.PHONY: web docs test security cross build master agent clean
 
 web:
 	cd www && pnpm install --frozen-lockfile && pnpm build
@@ -24,9 +24,9 @@ cross:
 		GOOS=$${target%/*} GOARCH=$${target#*/} CGO_ENABLED=0 go build -trimpath -o "$$build_dir/agent-$${target%/*}-$${target#*/}$$suffix" ./cmd/frp-panel-agent; \
 	done
 
-build: web controller agent
+build: web master agent
 
-controller:
+master:
 	CGO_ENABLED=0 go build -trimpath -o dist/frp-panel ./cmd/frpp
 
 agent:

@@ -11,7 +11,7 @@ import (
 )
 
 func ListClientsHandler(ctx *app.Context, req *pb.ListClientsRequest) (*pb.ListClientsResponse, error) {
-	logger.Logger(ctx).Infof("list client, req: [%+v]", req)
+	logger.Logger(ctx).Infof("list Clients, page: [%d], page size: [%d]", req.GetPage(), req.GetPageSize())
 
 	var (
 		userInfo = common.GetUserInfo(ctx)
@@ -61,7 +61,6 @@ func ListClientsHandler(ctx *app.Context, req *pb.ListClientsRequest) (*pb.ListC
 
 		respCli := &pb.Client{
 			Id:        lo.ToPtr(c.ClientID),
-			Config:    lo.ToPtr(string(c.ConfigContent)),
 			ServerId:  lo.ToPtr(c.ServerID),
 			Stopped:   lo.ToPtr(c.Stopped),
 			Comment:   lo.ToPtr(c.Comment),

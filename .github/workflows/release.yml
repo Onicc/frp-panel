@@ -114,7 +114,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: controller
+          - target: master
             image: onicc/frp-panel
           - target: agent
             image: onicc/frp-panel-agent

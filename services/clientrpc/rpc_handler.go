@@ -11,24 +11,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// func clientHandleServerSend(req *pb.ServerMessage) *pb.ClientMessage {
-// 	logger.Logger(c).Infof("client get a server message, origin is: [%+v]", req)
-// 	return &pb.ClientMessage{
-// 		Event:     pb.Event_EVENT_DATA,
-// 		ClientId:  req.ClientId,
-// 		SessionId: req.SessionId,
-// 		Data:      req.Data,
-// 	}
-// }
-
-func registClientToMaster(ctx context.Context, appInstance app.Application, recvStream pb.Master_ServerSendClient, event pb.Event, clientID, clientSecret string) {
-	logger.Logger(ctx).Infof("start to regist client to master")
+func registerWithMaster(ctx context.Context, recvStream pb.Master_ServerSendClient, event pb.Event, componentID, componentSecret string) {
+	logger.Logger(ctx).Info("register managed component with Master")
 	for {
 		err := recvStream.Send(&pb.ClientMessage{
 			Event:     event,
-			ClientId:  clientID,
+			ClientId:  componentID,
 			SessionId: uuid.New().String(),
-			Secret:    clientSecret,
+			Secret:    componentSecret,
 		})
 		if err != nil {
 			if ctx.Err() != nil {
@@ -53,7 +43,7 @@ func registClientToMaster(ctx context.Context, appInstance app.Application, recv
 		}
 
 		if resp.GetEvent() == event {
-			logger.Logger(ctx).Infof("client get server register envent success, clientID: %s", resp.GetClientId())
+			logger.Logger(ctx).Infof("managed component registered with Master, component ID: [%s]", resp.GetClientId())
 			break
 		}
 	}
@@ -122,7 +112,7 @@ func startClientRpcHandler(ctx context.Context, appInstance app.Application, cli
 				continue
 			}
 
-			registClientToMaster(ctx, appInstance, recvStream, event, clientID, clientSecret)
+			registerWithMaster(ctx, recvStream, event, clientID, clientSecret)
 			runClientRPCHandler(ctx, appInstance, recvStream, clientID, clientHandleServerSend)
 		}
 	}

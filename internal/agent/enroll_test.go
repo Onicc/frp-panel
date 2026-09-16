@@ -17,7 +17,7 @@ func TestEnroll(t *testing.T) {
 			t.Fatalf("unexpected body: %#v, %v", body, err)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"nodeId":"owner.c.mac","secret":"permanent-secret"}`))
+		_, _ = w.Write([]byte(`{"clientId":"owner.c.mac","secret":"permanent-secret"}`))
 	}))
 	defer server.Close()
 
@@ -25,13 +25,13 @@ func TestEnroll(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.NodeID != "owner.c.mac" || result.Secret != "permanent-secret" {
+	if result.ClientID != "owner.c.mac" || result.Secret != "permanent-secret" {
 		t.Fatalf("unexpected enrollment: %+v", result)
 	}
 }
 
 func TestEnrollRejectsInvalidURL(t *testing.T) {
-	if _, err := Enroll("file:///tmp/controller", "token", false); err == nil {
-		t.Fatal("unsafe controller URL accepted")
+	if _, err := Enroll("file:///tmp/master", "token", false); err == nil {
+		t.Fatal("unsafe Master URL accepted")
 	}
 }

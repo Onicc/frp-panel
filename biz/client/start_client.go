@@ -7,7 +7,7 @@ import (
 )
 
 func StartFRPCHandler(ctx *app.Context, req *pb.StartFRPCRequest) (*pb.StartFRPCResponse, error) {
-	logger.Logger(ctx).Infof("client get a start client request, origin is: [%+v]", req)
+	logger.Logger(ctx).Infof("start Client Agent, client: [%s]", req.GetClientId())
 
 	if err := PullConfig(ctx.GetApp(), req.GetClientId(), ctx.GetApp().GetConfig().Client.Secret); err != nil {
 		logger.Logger(ctx).WithError(err).Error("cannot pull client config")

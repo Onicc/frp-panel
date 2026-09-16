@@ -96,7 +96,7 @@ func UpdateProxyConfig(c *app.Context, req *pb.UpdateProxyConfigRequest) (*pb.Up
 		Model:             oldProxyCfg.Model,
 		ProxyConfigEntity: proxyCfg,
 	}) != nil {
-		logger.Logger(c).Errorf("update proxy config failed, cfg: [%+v]", proxyCfg)
+		logger.Logger(c).Errorf("update Tunnel failed, client: [%s], server: [%s], name: [%s]", req.GetClientId(), req.GetServerId(), proxyCfg.Name)
 		return nil, fmt.Errorf("update proxy config failed")
 	}
 

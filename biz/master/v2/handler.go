@@ -28,15 +28,14 @@ func Configure(router *gin.RouterGroup, appInstance app.Application) {
 	protected := router.Group("", middleware.JWTAuth(appInstance), middleware.AuthCtx(appInstance), middleware.RBAC(appInstance))
 	protected.GET("/capabilities", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"controller": gin.H{"os": "linux", "docker": true, "embeddedFrps": false, "standaloneFrps": true},
-			"agent":      protocol.CurrentCapabilities(),
+			"master": gin.H{"os": "linux", "docker": true, "embeddedFrps": false, "standaloneFrps": true},
+			"agent":  protocol.CurrentCapabilities(),
 		})
 	})
+	protected.GET("/account", getAccount(appInstance))
+	protected.POST("/account/password", changePassword(appInstance))
 	protected.POST("/enrollments", createEnrollment(appInstance))
 	protected.POST("/server-enrollments", createServerEnrollment(appInstance))
-	protected.GET("/node-routes", listNodeRoutes(appInstance))
-	protected.POST("/node-routes", createNodeRoute(appInstance))
-	protected.DELETE("/node-routes", deleteNodeRoute(appInstance))
 	protected.GET("/tunnels", listTunnels(appInstance))
 	protected.POST("/tunnels", createTunnel(appInstance))
 	protected.DELETE("/tunnels", deleteTunnel(appInstance))

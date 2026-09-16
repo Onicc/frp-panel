@@ -20,7 +20,7 @@ func TestResolveEnrollsOnceThenUsesPersistedCredentials(t *testing.T) {
 	defer httpServer.Close()
 
 	path := filepath.Join(t.TempDir(), "server.yaml")
-	options := ResolveOptions{ConfigPath: path, EnrollmentToken: "one-use-token", APIURL: httpServer.URL, RPCURL: "ws://controller.test"}
+	options := ResolveOptions{ConfigPath: path, EnrollmentToken: "one-use-token", APIURL: httpServer.URL, RPCURL: "ws://master.test"}
 	first, err := Resolve(options)
 	if err != nil {
 		t.Fatal(err)

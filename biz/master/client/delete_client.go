@@ -12,7 +12,7 @@ import (
 )
 
 func DeleteClientHandler(ctx *app.Context, req *pb.DeleteClientRequest) (*pb.DeleteClientResponse, error) {
-	logger.Logger(ctx).Infof("delete client, req: [%+v]", req)
+	logger.Logger(ctx).Infof("delete Client, client: [%s]", req.GetClientId())
 
 	userInfo := common.GetUserInfo(ctx)
 	clientID := req.GetClientId()

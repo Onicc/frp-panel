@@ -16,7 +16,7 @@ RUN apk add --no-cache ca-certificates git tzdata
 COPY go.mod go.sum ./
 RUN go mod download
 
-FROM go-base AS controller-build
+FROM go-base AS master-build
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION=dev
@@ -39,9 +39,9 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
     -ldflags="-s -w -X github.com/Onicc/frp-panel/conf.gitVersion=${VERSION} -X github.com/Onicc/frp-panel/conf.gitCommit=${COMMIT} -X github.com/Onicc/frp-panel/conf.buildDate=${BUILD_DATE}" \
     -o /out/frp-panel-agent ./cmd/frp-panel-agent
 
-FROM alpine:3.23 AS controller
+FROM alpine:3.23 AS master
 RUN apk add --no-cache ca-certificates tzdata && addgroup -S -g 10001 frp-panel && adduser -S -D -H -u 10001 -G frp-panel frp-panel && mkdir -p /data && chown frp-panel:frp-panel /data
-COPY --from=controller-build /out/frp-panel /usr/local/bin/frp-panel
+COPY --from=master-build /out/frp-panel /usr/local/bin/frp-panel
 USER 10001:10001
 VOLUME ["/data"]
 EXPOSE 9000 9001

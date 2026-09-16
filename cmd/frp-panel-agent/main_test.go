@@ -12,7 +12,7 @@ import (
 	"github.com/Onicc/frp-panel/internal/agentservice"
 )
 
-func TestNodeIDMatchesEnrollment(t *testing.T) {
+func TestClientIDMatchesEnrollment(t *testing.T) {
 	tests := []struct {
 		requested, enrolled string
 		want                bool
@@ -23,18 +23,18 @@ func TestNodeIDMatchesEnrollment(t *testing.T) {
 		{"other", "owner.c.mac", false},
 	}
 	for _, test := range tests {
-		if got := nodeIDMatchesEnrollment(test.requested, test.enrolled); got != test.want {
-			t.Fatalf("nodeIDMatchesEnrollment(%q, %q) = %t, want %t", test.requested, test.enrolled, got, test.want)
+		if got := clientIDMatchesEnrollment(test.requested, test.enrolled); got != test.want {
+			t.Fatalf("clientIDMatchesEnrollment(%q, %q) = %t, want %t", test.requested, test.enrolled, got, test.want)
 		}
 	}
 }
 
-func TestReuseExistingConfigRequiresMatchingNodeAndController(t *testing.T) {
+func TestReuseExistingConfigRequiresMatchingClientAndController(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "agent.yaml")
 	existing := agent.Config{
 		Version:     agent.ConfigVersion,
-		Controller:  agent.Controller{APIURL: "https://panel.example.com", RPCURL: "wss://panel.example.com"},
-		Credentials: agent.Credentials{NodeID: "owner.c.node", Secret: "stored-secret"},
+		Master:      agent.Master{APIURL: "https://panel.example.com", RPCURL: "wss://panel.example.com"},
+		Credentials: agent.Credentials{ClientID: "owner.c.client", Secret: "stored-secret"},
 	}
 	raw, err := agent.EncodeConfig(existing)
 	if err != nil {
@@ -45,8 +45,8 @@ func TestReuseExistingConfigRequiresMatchingNodeAndController(t *testing.T) {
 	}
 
 	requested := agent.Config{
-		Controller:  agent.Controller{APIURL: "https://panel.example.com/", RPCURL: "wss://panel.example.com/"},
-		Credentials: agent.Credentials{NodeID: "node"},
+		Master:      agent.Master{APIURL: "https://panel.example.com/", RPCURL: "wss://panel.example.com/"},
+		Credentials: agent.Credentials{ClientID: "client"},
 	}
 	got, err := reuseExistingConfig(path, requested)
 	if err != nil {
@@ -56,26 +56,26 @@ func TestReuseExistingConfigRequiresMatchingNodeAndController(t *testing.T) {
 		t.Fatalf("reused secret = %q, want stored credential", got.Credentials.Secret)
 	}
 
-	requested.Credentials.NodeID = "different"
+	requested.Credentials.ClientID = "different"
 	if _, err := reuseExistingConfig(path, requested); err == nil {
-		t.Fatal("expected a node mismatch to reject the installed configuration")
+		t.Fatal("expected a Client mismatch to reject the installed configuration")
 	}
-	requested.Credentials.NodeID = ""
+	requested.Credentials.ClientID = ""
 	if _, err := reuseExistingConfig(path, requested); err == nil {
-		t.Fatal("expected an omitted node ID to reject the installed configuration")
+		t.Fatal("expected an omitted Client ID to reject the installed configuration")
 	}
-	requested.Credentials.NodeID = "node"
-	requested.Controller.APIURL = "https://other.example.com"
+	requested.Credentials.ClientID = "client"
+	requested.Master.APIURL = "https://other.example.com"
 	if _, err := reuseExistingConfig(path, requested); err == nil {
-		t.Fatal("expected a controller mismatch to reject the installed configuration")
+		t.Fatal("expected a Master mismatch to reject the installed configuration")
 	}
 }
 
 func TestConfigForInstallReusesMatchingConfigAfterEnrollmentFailure(t *testing.T) {
-	controller := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	masterServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "expired", http.StatusUnauthorized)
 	}))
-	defer controller.Close()
+	defer masterServer.Close()
 
 	root := t.TempDir()
 	layout, err := agentservice.LayoutFor(runtime.GOOS, root, os.Getenv)
@@ -84,8 +84,8 @@ func TestConfigForInstallReusesMatchingConfigAfterEnrollmentFailure(t *testing.T
 	}
 	existing := agent.Config{
 		Version:     agent.ConfigVersion,
-		Controller:  agent.Controller{APIURL: controller.URL, RPCURL: "ws://controller.example.test"},
-		Credentials: agent.Credentials{NodeID: "owner.c.node", Secret: "stored-secret"},
+		Master:      agent.Master{APIURL: masterServer.URL, RPCURL: "ws://master.example.test"},
+		Credentials: agent.Credentials{ClientID: "owner.c.client", Secret: "stored-secret"},
 	}
 	raw, err := agent.EncodeConfig(existing)
 	if err != nil {
@@ -105,9 +105,9 @@ func TestConfigForInstallReusesMatchingConfigAfterEnrollmentFailure(t *testing.T
 	}
 	for name, value := range map[string]string{
 		"root":             root,
-		"api-url":          controller.URL,
-		"rpc-url":          "ws://controller.example.test",
-		"node-id":          "node",
+		"api-url":          masterServer.URL,
+		"rpc-url":          "ws://master.example.test",
+		"client-id":        "client",
 		"enrollment-token": "already-consumed",
 	} {
 		if err := install.Flags().Set(name, value); err != nil {

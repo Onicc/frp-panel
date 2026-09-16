@@ -21,11 +21,11 @@ import (
 const enrollmentLifetime = 10 * time.Minute
 
 type createEnrollmentRequest struct {
-	NodeID string `json:"nodeId" binding:"required"`
+	ClientID string `json:"clientId" binding:"required"`
 }
 
 type createEnrollmentResponse struct {
-	NodeID    string    `json:"nodeId"`
+	ClientID  string    `json:"clientId"`
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expiresAt"`
 }
@@ -35,20 +35,20 @@ type redeemEnrollmentRequest struct {
 }
 
 type redeemEnrollmentResponse struct {
-	NodeID string `json:"nodeId"`
-	Secret string `json:"secret"`
+	ClientID string `json:"clientId"`
+	Secret   string `json:"secret"`
 }
 
 func createEnrollment(appInstance app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request createEnrollmentRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			AbortProblem(c, http.StatusBadRequest, "Invalid request", "nodeId is required")
+			AbortProblem(c, http.StatusBadRequest, "Invalid request", "clientId is required")
 			return
 		}
-		request.NodeID = strings.TrimSpace(request.NodeID)
-		if !utils.IsClientIDPermited(request.NodeID) {
-			AbortProblem(c, http.StatusBadRequest, "Invalid node ID", "use letters, numbers, underscores, or hyphens")
+		request.ClientID = strings.TrimSpace(request.ClientID)
+		if !utils.IsClientIDPermited(request.ClientID) {
+			AbortProblem(c, http.StatusBadRequest, "Invalid Client ID", "use letters, numbers, underscores, or hyphens")
 			return
 		}
 
@@ -62,9 +62,9 @@ func createEnrollment(appInstance app.Application) gin.HandlerFunc {
 			AbortProblem(c, http.StatusInternalServerError, "Enrollment failed", "could not generate a secure token")
 			return
 		}
-		globalID := app.GlobalClientID(userInfo.GetUserName(), "c", request.NodeID)
+		globalID := app.GlobalClientID(userInfo.GetUserName(), "c", request.ClientID)
 		expiresAt := time.Now().UTC().Add(enrollmentLifetime)
-		secret := utils.DeriveCredential(appInstance.GetConfig().App.GlobalSecret, "agent-node", token)
+		secret := utils.DeriveCredential(appInstance.GetConfig().App.GlobalSecret, "client-agent", token)
 		db := appInstance.GetDBManager().GetDefaultDB()
 		err = db.Transaction(func(tx *gorm.DB) error {
 			var previous models.AgentEnrollment
@@ -96,14 +96,14 @@ func createEnrollment(appInstance app.Application) gin.HandlerFunc {
 		})
 		if err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) || strings.Contains(strings.ToLower(err.Error()), "unique") {
-				AbortProblem(c, http.StatusConflict, "Node already exists", "choose a different node ID")
+				AbortProblem(c, http.StatusConflict, "Client already exists", "choose a different Client ID")
 				return
 			}
 			AbortProblem(c, http.StatusInternalServerError, "Enrollment failed", "the enrollment could not be stored")
 			return
 		}
 		c.Header("Cache-Control", "no-store")
-		c.JSON(http.StatusCreated, createEnrollmentResponse{NodeID: globalID, Token: token, ExpiresAt: expiresAt})
+		c.JSON(http.StatusCreated, createEnrollmentResponse{ClientID: globalID, Token: token, ExpiresAt: expiresAt})
 	}
 }
 
@@ -132,7 +132,7 @@ func redeemEnrollment(appInstance app.Application) gin.HandlerFunc {
 			if err := tx.Where("client_id = ?", enrollment.ClientID).First(&client).Error; err != nil {
 				return err
 			}
-			secret := utils.DeriveCredential(appInstance.GetConfig().App.GlobalSecret, "agent-node", request.Token)
+			secret := utils.DeriveCredential(appInstance.GetConfig().App.GlobalSecret, "client-agent", request.Token)
 			if !utils.CheckCredential(secret, client.ConnectSecret) {
 				return errEnrollmentInvalid
 			}
@@ -144,7 +144,7 @@ func redeemEnrollment(appInstance app.Application) gin.HandlerFunc {
 			if result.RowsAffected != 1 {
 				return errEnrollmentInvalid
 			}
-			response = redeemEnrollmentResponse{NodeID: enrollment.ClientID, Secret: secret}
+			response = redeemEnrollmentResponse{ClientID: enrollment.ClientID, Secret: secret}
 			return nil
 		})
 		if err != nil {

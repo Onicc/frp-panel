@@ -1,12 +1,12 @@
 # frp-panel v2
 
-面向 FRP 的开源控制面，包含安全的 Web 控制台与跨平台节点 Agent。
+面向 FRP 的开源控制面，包含安全的 Web 控制台与跨平台 Client Agent。
 
 > v2 是全新版本，不迁移 v1 数据库，也不保留旧客户端 CLI 的兼容层。
 
 ## 主要变化
 
-- Master 控制面、可独立部署的 FRPS 数据面与轻量节点程序 `frp-panel-agent` 相互分离。
+- Master 控制面、可独立部署的 Server（FRPS）数据面与轻量 Client Agent `frp-panel-agent` 相互分离。
 - Agent 支持 Linux、macOS、Windows 的 amd64/arm64 主流平台。
 - 安装命令写入系统规范目录，不再污染执行命令时的当前目录。
 - 使用 Vite 8 / React 19 重写中英文控制台；创建、编辑成功后统一关闭并重置弹窗，失败时保留现场。
@@ -16,7 +16,7 @@
 
 ## 部署 Master、Server 与 Client
 
-使用仓库 Compose 文件部署唯一的 Master。Master 只负责 Web 控制台和期望配置，不承载代理流量。在 **服务端** 中创建任意数量的 Server；每次创建都会生成一份带一次性令牌的 FRPS Docker Compose 部署。在 **节点** 中创建 Client，使用生成的 Linux、macOS 或 Windows 命令安装，再在同一页面分配 FRPS 链路。同一个 Client 可以连接多个 Server。
+使用仓库 Compose 文件部署唯一的 Master。Master 只负责 Web 控制台和期望配置，不承载代理流量。在 **Servers** 中创建任意数量的 Server；每次创建都会生成一份带一次性令牌的 FRPS Docker Compose 部署。在 **Clients** 中创建 Client，并使用生成的 Linux、macOS 或 Windows 命令安装 Client Agent。创建 Tunnel 时直接选择 Client 与 Server；同一个 Client 可创建多条 Tunnel，每条可选择不同 Server，底层 FRPC 连接由 Master 自动建立、复用和回收。
 
 Server 和 Client 的注册令牌都在 10 分钟后过期且只能兑换一次。长期凭据在 Master 中仅保存哈希，明文只写入受管主机的受保护文件或数据卷。
 

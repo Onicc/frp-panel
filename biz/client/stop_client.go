@@ -9,7 +9,7 @@ import (
 )
 
 func StopFRPCHandler(ctx *app.Context, req *pb.StopFRPCRequest) (*pb.StopFRPCResponse, error) {
-	logger.Logger(ctx).Infof("client get a stop client request, origin is: [%+v]", req)
+	logger.Logger(ctx).Infof("stop Client Agent, client: [%s]", req.GetClientId())
 
 	ctx.GetApp().GetClientController().StopAll()
 	ctx.GetApp().GetClientController().DeleteAll()

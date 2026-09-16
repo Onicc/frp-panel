@@ -35,7 +35,6 @@ func GetServerHandler(c *app.Context, req *pb.GetServerRequest) (*pb.GetServerRe
 		Status: &pb.Status{Code: pb.RespCode_RESP_CODE_SUCCESS, Message: "ok"},
 		Server: &pb.Server{
 			Id:       lo.ToPtr(serverEntity.ServerID),
-			Config:   lo.ToPtr(string(serverEntity.ConfigContent)),
 			Comment:  lo.ToPtr(serverEntity.Comment),
 			Ip:       lo.ToPtr(serverEntity.ServerIP),
 			FrpsUrls: serverEntity.FrpsUrls,

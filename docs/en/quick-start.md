@@ -12,10 +12,10 @@ Open **Servers → Create server**, then enter the target host's public address 
 
 ## 3. Client (FRPC)
 
-Open **Nodes → Add node**, select Linux, macOS, or Windows, and run the generated one-use command on the target node. The installer uses OS-owned locations and registers the native service.
+Open **Clients → Add Client**, select Linux, macOS, or Windows, and run the generated one-use command on the target Client host. The installer places the Client Agent in OS-owned locations and registers the native service.
 
-## 4. Assign routes
+## 4. Create a Tunnel
 
-On **Nodes**, assign the FRPS routes used by each Client. Different Clients may use different Servers, and one Client may connect to multiple Servers. Configure tunnels against an explicit node and Server pair.
+Open **Tunnels → Create Tunnel**, directly select a Client and Server, then configure the local service and public port. A Client may own multiple Tunnels and each may select a different Server; Master automatically creates, shares, and removes the underlying FRPC connections.
 
 See the [deployment guide](/en/deployment) for raw Compose files, environment settings, ports, acceptance checks, and backup guidance.

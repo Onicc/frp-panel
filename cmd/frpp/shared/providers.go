@@ -243,18 +243,13 @@ func NewClientCred(appInstance app.Application) credentials.TransportCredentials
 
 const splitter = "\n--------------------------------------------\n"
 
-func NewConfigPrinter(param struct {
+func NewRuntimeInfoLogger(param struct {
 	fx.In
 
-	Ctx    *app.Context
-	Config conf.Config
+	Ctx *app.Context
 }) {
-	var (
-		ctx    = param.Ctx
-		config = param.Config
-	)
-	logger.Logger(ctx).Infof("%srunning config is: %s%s", splitter, config.PrintStr(), splitter)
-	logger.Logger(ctx).Infof("%scurrent version: \n%s%s", splitter, conf.GetVersion().String(), splitter)
+	logger.Logger(param.Ctx).Info("runtime configuration loaded")
+	logger.Logger(param.Ctx).Infof("%scurrent version: \n%s%s", splitter, conf.GetVersion().String(), splitter)
 }
 
 func NewWorkersManager(lx fx.Lifecycle, mgr app.WorkerExecManager, appInstance app.Application) app.WorkersManager {

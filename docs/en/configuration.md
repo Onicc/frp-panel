@@ -1,4 +1,4 @@
-# Controller configuration
+# Master configuration
 
 Primary environment variables:
 

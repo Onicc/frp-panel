@@ -40,7 +40,7 @@ func NewServerHandler(svrCfg *v1.ServerConfig) (app.ServerHandler, error) {
 		return nil, err
 	}
 
-	logger.Logger(ctx).Debugf("create server, config is: [ %+v ]", svrCfg)
+	logger.Logger(ctx).Debug("create Server runtime")
 
 	return &serverImpl{
 		srv:       svr,

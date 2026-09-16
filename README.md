@@ -1,12 +1,12 @@
 # frp-panel v2
 
-An open-source FRP control plane with a secure Web console and a cross-platform node Agent.
+An open-source FRP control plane with a secure Web console and a cross-platform Client Agent.
 
 > v2 is a clean break. It does not migrate v1 databases or preserve the old client CLI.
 
 ## What changed
 
-- Separate Master control plane, independently deployable FRPS data planes, and lightweight `frp-panel-agent` nodes.
+- Separate Master control plane, independently deployable Server (FRPS) data planes, and a lightweight `frp-panel-agent` Client Agent.
 - Linux amd64/arm64, macOS amd64/arm64, and Windows amd64/arm64 Agent builds.
 - Correct system installation paths; the bootstrap command never installs into the current directory.
 - Vite 8 / React 19 bilingual console with controlled mutation dialogs.
@@ -16,7 +16,7 @@ An open-source FRP control plane with a secure Web console and a cross-platform 
 
 ## Deploy Master, Server, and Client
 
-Deploy exactly one Master with the repository Compose file. Master owns the Web console and desired state but carries no proxy traffic. Create any number of Servers in **Servers**; each creation returns a one-time Docker Compose deployment for an independent FRPS host. Create Clients in **Nodes**, install them with the generated Linux, macOS, or Windows command, then assign their FRPS routes from the same page. One Client may use multiple Servers.
+Deploy exactly one Master with the repository Compose file. Master owns the Web console and desired state but carries no proxy traffic. Create any number of Servers in **Servers**; each creation returns a one-time Docker Compose deployment for an independent FRPS host. Create Clients in **Clients** and install the Client Agent with the generated Linux, macOS, or Windows command. Select a Client and Server directly on every Tunnel; one Client can own multiple Tunnels that use different Servers, while Master creates, shares, and removes the underlying FRPC connections automatically.
 
 Both Server and Client bootstrap tokens expire after ten minutes and can be redeemed only once. Persistent credentials are hashed in Master and stored only in protected files or volumes on the managed host.
 

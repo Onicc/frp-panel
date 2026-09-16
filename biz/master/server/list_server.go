@@ -50,7 +50,6 @@ func ListServersHandler(c *app.Context, req *pb.ListServersRequest) (*pb.ListSer
 		Servers: lo.Map(servers, func(c *models.ServerEntity, _ int) *pb.Server {
 			return &pb.Server{
 				Id:       lo.ToPtr(c.ServerID),
-				Config:   lo.ToPtr(string(c.ConfigContent)),
 				Ip:       lo.ToPtr(c.ServerIP),
 				Comment:  lo.ToPtr(c.Comment),
 				FrpsUrls: c.FrpsUrls,

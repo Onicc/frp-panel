@@ -8,4 +8,4 @@ pnpm test
 pnpm build
 ```
 
-The production build is written to `cmd/frpp/out` for embedding in the controller binary.
+The production build is written to `cmd/frpp/out` for embedding in the Master binary.

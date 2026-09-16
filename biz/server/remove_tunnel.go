@@ -9,7 +9,7 @@ import (
 )
 
 func RemoveFrpsHandler(ctx *app.Context, req *pb.RemoveFRPSRequest) (*pb.RemoveFRPSResponse, error) {
-	logger.Logger(ctx).Infof("remove frps, req: [%+v]", req)
+	logger.Logger(ctx).Infof("remove Server runtime, server: [%s]", req.GetServerId())
 
 	if req.GetServerId() == "" {
 		return &pb.RemoveFRPSResponse{

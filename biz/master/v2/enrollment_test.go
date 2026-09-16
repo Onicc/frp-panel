@@ -39,7 +39,7 @@ func TestAgentEnrollmentCanReplaceOnlyAnUnusedToken(t *testing.T) {
 	createRouter.POST("/api/v2/enrollments", createEnrollment(application))
 	create := func() (int, createEnrollmentResponse) {
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/api/v2/enrollments", bytes.NewBufferString(`{"nodeId":"mac"}`))
+		request := httptest.NewRequest(http.MethodPost, "/api/v2/enrollments", bytes.NewBufferString(`{"clientId":"mac"}`))
 		request.Header.Set("Content-Type", "application/json")
 		createRouter.ServeHTTP(recorder, request)
 		var response createEnrollmentResponse
@@ -48,7 +48,7 @@ func TestAgentEnrollmentCanReplaceOnlyAnUnusedToken(t *testing.T) {
 	}
 
 	status, first := create()
-	if status != http.StatusCreated || first.NodeID != "owner.c.mac" || len(first.Token) < 32 {
+	if status != http.StatusCreated || first.ClientID != "owner.c.mac" || len(first.Token) < 32 {
 		t.Fatalf("first enrollment status = %d, response = %#v", status, first)
 	}
 	status, replacement := create()
@@ -73,15 +73,15 @@ func TestAgentEnrollmentCanReplaceOnlyAnUnusedToken(t *testing.T) {
 		t.Fatalf("replacement token status = %d", status)
 	}
 	if status, _ := create(); status != http.StatusConflict {
-		t.Fatalf("redeemed node recreation status = %d", status)
+		t.Fatalf("redeemed Client recreation status = %d", status)
 	}
 
 	var client models.Client
-	if err := db.Where("client_id = ?", replacement.NodeID).First(&client).Error; err != nil {
+	if err := db.Where("client_id = ?", replacement.ClientID).First(&client).Error; err != nil {
 		t.Fatal(err)
 	}
-	secret := utils.DeriveCredential(cfg.App.GlobalSecret, "agent-node", replacement.Token)
+	secret := utils.DeriveCredential(cfg.App.GlobalSecret, "client-agent", replacement.Token)
 	if client.ConnectSecret == secret || !utils.CheckCredential(secret, client.ConnectSecret) {
-		t.Fatal("node credential was not stored as a one-way hash")
+		t.Fatal("Client credential was not stored as a one-way hash")
 	}
 }

@@ -8,9 +8,10 @@ import './styles.css'
 
 const Login = lazy(() => import('./pages/Login'))
 const Overview = lazy(() => import('./pages/Overview'))
-const Nodes = lazy(() => import('./pages/Nodes'))
+const Clients = lazy(() => import('./pages/Clients'))
 const Servers = lazy(() => import('./pages/Servers'))
 const Tunnels = lazy(() => import('./pages/Tunnels'))
+const Account = lazy(() => import('./pages/Account'))
 
 function ProtectedLayout() {
   const [authenticated, setAuthenticated] = useState(() => Boolean(sessionToken()))
@@ -23,9 +24,10 @@ function App() {
     <Route path="/login" element={<Login />} />
     <Route element={<ProtectedLayout />}>
       <Route index element={<Overview />} />
-      <Route path="nodes" element={<Nodes />} />
+      <Route path="clients" element={<Clients />} />
       <Route path="servers" element={<Servers />} />
       <Route path="tunnels" element={<Tunnels />} />
+      <Route path="account" element={<Account />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></Suspense></BrowserRouter></I18nProvider>

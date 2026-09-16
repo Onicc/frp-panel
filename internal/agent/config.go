@@ -10,26 +10,26 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const ConfigVersion = 2
+const ConfigVersion = 3
 
 // Config is the on-disk agent configuration. Credentials intentionally live in
 // a mode-0600 file instead of the service command line.
 type Config struct {
 	Version     int         `yaml:"version"`
-	Controller  Controller  `yaml:"controller"`
+	Master      Master      `yaml:"master"`
 	Credentials Credentials `yaml:"credentials"`
 	TLS         TLS         `yaml:"tls"`
 	Features    Features    `yaml:"features"`
 }
 
-type Controller struct {
+type Master struct {
 	APIURL string `yaml:"api_url"`
 	RPCURL string `yaml:"rpc_url"`
 }
 
 type Credentials struct {
-	NodeID string `yaml:"node_id"`
-	Secret string `yaml:"secret"`
+	ClientID string `yaml:"client_id"`
+	Secret   string `yaml:"secret"`
 }
 
 type TLS struct {
@@ -47,11 +47,11 @@ func (c Config) Validate() error {
 	if c.Version != ConfigVersion {
 		return fmt.Errorf("unsupported config version %d", c.Version)
 	}
-	if c.Controller.APIURL == "" || c.Controller.RPCURL == "" {
-		return errors.New("controller.api_url and controller.rpc_url are required")
+	if c.Master.APIURL == "" || c.Master.RPCURL == "" {
+		return errors.New("master.api_url and master.rpc_url are required")
 	}
-	if c.Credentials.NodeID == "" || c.Credentials.Secret == "" {
-		return errors.New("credentials.node_id and credentials.secret are required")
+	if c.Credentials.ClientID == "" || c.Credentials.Secret == "" {
+		return errors.New("credentials.client_id and credentials.secret are required")
 	}
 	if c.Features.Functions && (c.Features.WorkerdBinary == "" || !filepath.IsAbs(c.Features.WorkerdBinary)) {
 		return errors.New("features.workerd_binary must be an absolute path when functions are enabled")
@@ -83,10 +83,10 @@ func EncodeConfig(cfg Config) ([]byte, error) {
 
 func (c Config) LegacyConfig() conf.Config {
 	cfg := conf.DefaultConfig()
-	cfg.Client.ID = c.Credentials.NodeID
+	cfg.Client.ID = c.Credentials.ClientID
 	cfg.Client.Secret = c.Credentials.Secret
-	cfg.Client.APIUrl = c.Controller.APIURL
-	cfg.Client.RPCUrl = c.Controller.RPCURL
+	cfg.Client.APIUrl = c.Master.APIURL
+	cfg.Client.RPCUrl = c.Master.RPCURL
 	cfg.Client.TLSInsecureSkipVerify = c.TLS.InsecureSkipVerify
 	cfg.Client.Features.EnableFunctions = c.Features.Functions
 	cfg.Client.Features.EnableRemoteShell = c.Features.RemoteShell

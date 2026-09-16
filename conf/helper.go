@@ -65,6 +65,7 @@ func PermissionsForRole(role string) []defs.APIPermission {
 	permissions := []defs.APIPermission{
 		{Method: "GET", Path: "*"},
 		{Method: "POST", Path: `^/api/v1/(user/(get|update)|platform/clientsstatus|client/(get|list)|server/(get|list)|proxy/(get_by_cid|get_by_sid|list_configs|get_config)|worker/(get|status|list|get_ingress)|wg/.*(get|list|topology))$`},
+		{Method: "POST", Path: `^/api/v2/account/password$`},
 	}
 	switch role {
 	case defs.UserRole_Owner, defs.UserRole_Admin:
@@ -72,8 +73,8 @@ func PermissionsForRole(role string) []defs.APIPermission {
 	case defs.UserRole_Operator:
 		permissions = append(permissions,
 			defs.APIPermission{Method: "POST", Path: `^/api/v1/(client|server|frpc|frps|proxy|wg|worker)(/.*)?$`},
-			defs.APIPermission{Method: "POST", Path: `^/api/v2/(enrollments|server-enrollments|node-routes|tunnels)$`},
-			defs.APIPermission{Method: "DELETE", Path: `^/api/v2/(node-routes|tunnels)$`},
+			defs.APIPermission{Method: "POST", Path: `^/api/v2/(enrollments|server-enrollments|tunnels)$`},
+			defs.APIPermission{Method: "DELETE", Path: `^/api/v2/tunnels$`},
 		)
 	}
 	return permissions

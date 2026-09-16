@@ -28,7 +28,7 @@ func BuildCommand(fs embed.FS) *cobra.Command {
 func NewMasterCmd(cfg conf.Config, fs embed.FS) *cobra.Command {
 	return &cobra.Command{
 		Use:   "master",
-		Short: "Run the frp-panel controller",
+		Short: "Run the frp-panel Master control plane",
 		Run: func(_ *cobra.Command, _ []string) {
 			if len(strings.TrimSpace(cfg.App.GlobalSecret)) < 32 {
 				logger.Logger(context.Background()).Fatal("APP_GLOBAL_SECRET must contain at least 32 non-whitespace characters")
@@ -38,16 +38,16 @@ func NewMasterCmd(cfg conf.Config, fs embed.FS) *cobra.Command {
 				commonMod,
 				masterMod,
 				fx.Supply(fx.Annotate(cfg, fx.ResultTags(`name:"originConfig"`)), fs),
-				fx.Invoke(NewConfigPrinter),
+				fx.Invoke(NewRuntimeInfoLogger),
 				fx.Invoke(runMaster),
 			}
 			if !cfg.IsDebug {
 				opts = append(opts, fx.NopLogger)
 			}
-			controller := fx.New(opts...)
-			controller.Run()
-			if err := controller.Err(); err != nil {
-				logger.Logger(context.Background()).Fatalf("controller application error: %v", err)
+			masterApplication := fx.New(opts...)
+			masterApplication.Run()
+			if err := masterApplication.Err(); err != nil {
+				logger.Logger(context.Background()).Fatalf("Master application error: %v", err)
 			}
 		},
 	}
@@ -74,8 +74,8 @@ func NewServerCmd(baseConfig conf.Config) *cobra.Command {
 			}
 			cfg.Client.ID = persisted.Credentials.ServerID
 			cfg.Client.Secret = persisted.Credentials.Secret
-			cfg.Client.APIUrl = persisted.Controller.APIURL
-			cfg.Client.RPCUrl = persisted.Controller.RPCURL
+			cfg.Client.APIUrl = persisted.Master.APIURL
+			cfg.Client.RPCUrl = persisted.Master.RPCURL
 			cfg.Client.TLSInsecureSkipVerify = persisted.TLS.InsecureSkipVerify
 
 			opts := []fx.Option{
@@ -83,7 +83,7 @@ func NewServerCmd(baseConfig conf.Config) *cobra.Command {
 				commonMod,
 				serverMod,
 				fx.Supply(fx.Annotate(cfg, fx.ResultTags(`name:"originConfig"`))),
-				fx.Invoke(NewConfigPrinter),
+				fx.Invoke(NewRuntimeInfoLogger),
 				fx.Invoke(runServer),
 			}
 			if !cfg.IsDebug {
@@ -103,8 +103,8 @@ func NewServerCmd(baseConfig conf.Config) *cobra.Command {
 	}
 	command.Flags().StringVar(&configPath, "config", defaultPath, "persistent server configuration path")
 	command.Flags().StringVar(&enrollmentToken, "enrollment-token", os.Getenv("SERVER_ENROLLMENT_TOKEN"), "short-lived server enrollment token")
-	command.Flags().StringVar(&apiURL, "api-url", baseConfig.Client.APIUrl, "controller public API URL")
-	command.Flags().StringVar(&rpcURL, "rpc-url", baseConfig.Client.RPCUrl, "controller public RPC URL")
+	command.Flags().StringVar(&apiURL, "api-url", baseConfig.Client.APIUrl, "Master public API URL")
+	command.Flags().StringVar(&rpcURL, "rpc-url", baseConfig.Client.RPCUrl, "Master public RPC URL")
 	return command
 }
 
@@ -116,7 +116,7 @@ func RunClientContext(ctx context.Context, cfg conf.Config) error {
 		clientMod,
 		commonMod,
 		fx.Supply(fx.Annotate(cfg, fx.ResultTags(`name:"originConfig"`))),
-		fx.Invoke(NewConfigPrinter),
+		fx.Invoke(NewRuntimeInfoLogger),
 		fx.Invoke(runClient),
 	}
 	if !cfg.IsDebug {

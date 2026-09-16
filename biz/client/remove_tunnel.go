@@ -10,7 +10,7 @@ import (
 )
 
 func RemoveFrpcHandler(ctx *app.Context, req *pb.RemoveFRPCRequest) (*pb.RemoveFRPCResponse, error) {
-	logger.Logger(ctx).Infof("remove frpc, req: [%+v], will exit in 10s", req)
+	logger.Logger(ctx).Infof("remove FRPC connection, client: [%s], will exit in 10s", req.GetClientId())
 
 	go func() {
 		time.Sleep(10 * time.Second)

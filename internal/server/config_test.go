@@ -10,7 +10,7 @@ func TestWriteAndReadConfig(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "data", "server.yaml")
 	expected := Config{
 		Version:     ConfigVersion,
-		Controller:  Controller{APIURL: "https://panel.example.test", RPCURL: "wss://panel.example.test"},
+		Master:      Master{APIURL: "https://panel.example.test", RPCURL: "wss://panel.example.test"},
 		Credentials: Credentials{ServerID: "owner.s.edge", Secret: "permanent-secret"},
 	}
 	if err := WriteConfig(path, expected); err != nil {

@@ -18,7 +18,7 @@ import (
 )
 
 func UpdateFrpsHander(c *app.Context, req *pb.UpdateFRPSRequest) (*pb.UpdateFRPSResponse, error) {
-	logger.Logger(c).Infof("update frps, req: [%+v]", req)
+	logger.Logger(c).Infof("update Server, server: [%s]", req.GetServerId())
 	var (
 		serverID  = req.GetServerId()
 		configStr = req.GetConfig()

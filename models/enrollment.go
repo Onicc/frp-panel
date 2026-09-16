@@ -20,7 +20,7 @@ func (*AgentEnrollment) TableName() string { return "agent_enrollments" }
 
 // ServerEnrollment is the FRPS equivalent of AgentEnrollment. The bootstrap
 // token is single-use and the long-lived Server credential is stored only as a
-// hash, so neither credential can be recovered from the controller database.
+// hash, so neither credential can be recovered from the Master database.
 type ServerEnrollment struct {
 	ID        string     `gorm:"primaryKey;type:varchar(36)"`
 	TokenHash string     `gorm:"uniqueIndex;not null;type:varchar(80)"`

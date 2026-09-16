@@ -13,7 +13,7 @@ import (
 )
 
 func RemoveFrpcHandler(c *app.Context, req *pb.RemoveFRPCRequest) (*pb.RemoveFRPCResponse, error) {
-	logger.Logger(c).Infof("remove frpc, req: [%+v]", req)
+	logger.Logger(c).Infof("remove FRPC connection, client: [%s]", req.GetClientId())
 
 	var (
 		clientID = req.GetClientId()

@@ -73,14 +73,14 @@ func ControlSystemServiceWithOptions(svcName string, args []string, action strin
 	logger.Logger(ctx).Info("try to ", action, " service, args:", args)
 	s, err := CreateSystemServiceWithOptions(svcName, args, run, options)
 	if err != nil {
-		logger.Logger(ctx).WithError(err).Error("create service controller failed")
+		logger.Logger(ctx).WithError(err).Error("create service manager failed")
 		return err
 	}
 
 	if err := service.Control(s, action); err != nil {
-		logger.Logger(ctx).WithError(err).Errorf("controller %v service failed", action)
+		logger.Logger(ctx).WithError(err).Errorf("service manager action %v failed", action)
 		return err
 	}
-	logger.Logger(ctx).Infof("controller %v service success", action)
+	logger.Logger(ctx).Infof("service manager action %v succeeded", action)
 	return nil
 }

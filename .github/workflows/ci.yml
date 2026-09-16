@@ -64,5 +64,5 @@ jobs:
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
       - name: Docker build check
         run: |
-          docker build --target controller -t frp-panel-ci:controller .
+          docker build --target master -t frp-panel-ci:master .
           docker build --target agent -t frp-panel-ci:agent .

@@ -12,7 +12,7 @@ import (
 )
 
 func FRPAuth(ctx *app.Context, req *pb.FRPAuthRequest) (*pb.FRPAuthResponse, error) {
-	logger.Logger(ctx).Infof("frpc auth, req: [%+v]", req)
+	logger.Logger(ctx).Infof("authenticate FRPC connection, user: [%s]", req.GetUser())
 	var (
 		err error
 	)

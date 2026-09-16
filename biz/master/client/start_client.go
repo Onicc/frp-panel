@@ -12,7 +12,7 @@ import (
 )
 
 func StartFRPCHandler(ctx *app.Context, req *pb.StartFRPCRequest) (*pb.StartFRPCResponse, error) {
-	logger.Logger(ctx).Infof("master get a start client request, origin is: [%+v]", req)
+	logger.Logger(ctx).Infof("start Client Agent, client: [%s]", req.GetClientId())
 
 	userInfo := common.GetUserInfo(ctx)
 	clientID := req.GetClientId()

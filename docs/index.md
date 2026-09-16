@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "frp-panel v2"
   text: "安全、跨平台的 FRP 控制面"
-  tagline: Linux 控制器，Linux、macOS 与 Windows 节点 Agent
+  tagline: Linux Master，Linux、macOS 与 Windows Client Agent
   actions:
     - theme: brand
       text: 部署指南

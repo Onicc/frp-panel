@@ -12,7 +12,7 @@ import (
 )
 
 func StopFRPCHandler(ctx *app.Context, req *pb.StopFRPCRequest) (*pb.StopFRPCResponse, error) {
-	logger.Logger(ctx).Infof("master get a stop client request, origin is: [%+v]", req)
+	logger.Logger(ctx).Infof("stop Client Agent, client: [%s]", req.GetClientId())
 
 	userInfo := common.GetUserInfo(ctx)
 	clientID := req.GetClientId()

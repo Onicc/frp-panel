@@ -20,7 +20,7 @@ import (
 )
 
 func UpdateFrpcHander(c *app.Context, req *pb.UpdateFRPCRequest) (*pb.UpdateFRPCResponse, error) {
-	logger.Logger(c).Infof("update frpc, req: [%+v]", req)
+	logger.Logger(c).Infof("update FRPC connection, client: [%s], server: [%s]", req.GetClientId(), req.GetServerId())
 	var (
 		content     = req.GetConfig()
 		serverID    = req.GetServerId()
@@ -202,7 +202,7 @@ func UpdateFrpcHander(c *app.Context, req *pb.UpdateFRPCRequest) (*pb.UpdateFRPC
 
 		resp, err := rpc.CallClient(childCtx, cliToUpdate.ClientID, pb.Event_EVENT_UPDATE_FRPC, cliReq)
 		if err != nil {
-			logger.Logger(childCtx).WithError(err).Errorf("update event send to client error, server: [%s], client: [%+v], updated client: [%+v]", serverID, cliToUpdate, cli)
+			logger.Logger(childCtx).WithError(err).Errorf("update event send to Client Agent failed, client: [%s], connection: [%s], server: [%s]", cliToUpdate.ClientID, cli.ClientID, serverID)
 		}
 
 		if resp == nil {

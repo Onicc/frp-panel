@@ -390,7 +390,7 @@ func (m *clientMutation) AdminUpdateClientLastSeen(clientID string) error {
 func normalClientFilter(db *gorm.DB) *gorm.DB {
 	// 1. 没shadow过的老client
 	// 2. shadow过的shadow client
-	// 3. 非临时节点
+	// 3. 非临时 Client
 	return db.Where(
 		db.Where("origin_client_id is NULL").
 			Or("is_shadow = ?", true).

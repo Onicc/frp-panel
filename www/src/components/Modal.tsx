@@ -39,7 +39,7 @@ export function Modal({ open, title, submitLabel, onOpenChange, onSubmit, childr
 
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onOpenChange(false)}>
     <section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <div className="modal-header"><h2 id="modal-title">{title}</h2><button className="icon-button" aria-label="Close" onClick={() => onOpenChange(false)}>×</button></div>
+      <div className="modal-header"><h2 id="modal-title">{title}</h2><button type="button" className="icon-button" aria-label={t('close')} onClick={() => onOpenChange(false)}>×</button></div>
       <form ref={form} onSubmit={submit}>
         <div className="modal-body">{children}{error && <p className="error" role="alert">{error}</p>}</div>
         <div className="modal-actions"><button type="button" className="button secondary" onClick={() => onOpenChange(false)}>{t('cancel')}</button><button className="button primary" disabled={pending}>{pending ? t('saving') : (submitLabel ?? t('confirm'))}</button></div>

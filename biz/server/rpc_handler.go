@@ -20,7 +20,7 @@ func HandleServerMessage(appInstance app.Application, req *pb.ServerMessage) *pb
 	}()
 
 	ctx := context.Background()
-	logger.Logger(ctx).Infof("client get a server message, origin is: [%+v]", req)
+	logger.Logger(ctx).Infof("Server Agent received event: [%s]", req.GetEvent())
 
 	switch req.Event {
 	case pb.Event_EVENT_UPDATE_FRPS:

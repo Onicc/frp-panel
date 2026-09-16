@@ -6,16 +6,19 @@ test('unauthenticated users see the bilingual login screen', async ({ page }) =>
   }))
   await page.goto('/login')
   await expect(page.getByRole('heading', { level: 1 })).toContainText('安全地管理你的 FRP 网络')
-  await page.getByRole('button', { name: 'English' }).click()
+  await page.getByLabel('界面语言').selectOption('en')
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Manage your FRP network securely')
 })
 
 async function mockOverview(page: import('@playwright/test').Page) {
-  for (const path of ['client/list', 'server/list', 'proxy/list_configs']) {
+  for (const path of ['client/list', 'server/list']) {
     await page.route(`**/api/v1/${path}`, (route) => route.fulfill({
       status: 200, contentType: 'application/json', body: JSON.stringify({ code: 200, body: {} }),
     }))
   }
+  await page.route('**/api/v2/tunnels', (route) => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ tunnels: [] }),
+  }))
 }
 
 test('first-run setup uses password-manager semantics and enters the console', async ({ page }) => {
@@ -62,7 +65,7 @@ test('invalid login shows the real authentication error instead of ok', async ({
   await expect(page).toHaveURL('/login')
 })
 
-async function mockNodePage(page: import('@playwright/test').Page, enrollmentStatus = 201) {
+async function mockClientPage(page: import('@playwright/test').Page, enrollmentStatus = 201) {
   await page.addInitScript(() => localStorage.setItem('frp-panel.authenticated', '1'))
   await page.route('**/api/v1/client/list', (route) => route.fulfill({
     status: 200, contentType: 'application/json', body: JSON.stringify({ code: 200, body: { clients: [] } }),
@@ -70,14 +73,8 @@ async function mockNodePage(page: import('@playwright/test').Page, enrollmentSta
   await page.route('**/api/v1/platform/baseinfo', (route) => route.fulfill({
     status: 200, contentType: 'application/json', body: JSON.stringify({ code: 200, body: { clientApiUrl: 'https://panel.example.com', clientRpcUrl: 'wss://panel.example.com' } }),
   }))
-  await page.route('**/api/v1/server/list', (route) => route.fulfill({
-    status: 200, contentType: 'application/json', body: JSON.stringify({ code: 200, body: { servers: [] } }),
-  }))
-  await page.route('**/api/v2/node-routes', (route) => route.fulfill({
-    status: 200, contentType: 'application/json', body: JSON.stringify({ routes: [] }),
-  }))
   await page.route('**/api/v2/enrollments', (route) => route.fulfill(enrollmentStatus === 201 ? {
-    status: 201, contentType: 'application/json', body: JSON.stringify({ nodeId: 'owner.c.edge', token: 'one-use-token', expiresAt: '2026-09-15T12:00:00Z' }),
+    status: 201, contentType: 'application/json', body: JSON.stringify({ clientId: 'owner.c.edge', token: 'one-use-token', expiresAt: '2026-09-15T12:00:00Z' }),
   } : {
     status: 500, contentType: 'application/problem+json', body: JSON.stringify({ title: 'Enrollment failed', status: 500, detail: 'database unavailable' }),
   }))
@@ -96,22 +93,23 @@ async function mockServerPage(page: import('@playwright/test').Page) {
   }))
 }
 
-test('successful node creation closes the dialog and presents OS install tabs', async ({ page }) => {
-  await mockNodePage(page)
-  await page.goto('/nodes')
-  await page.getByRole('button', { name: /添加节点/ }).click()
-  await page.getByLabel('节点 ID').fill('edge')
+test('successful Client creation closes the dialog and presents OS install tabs', async ({ page }) => {
+  await mockClientPage(page)
+  await page.goto('/clients')
+  await page.getByRole('button', { name: /添加 Client/ }).click()
+  await page.getByLabel('Client ID').fill('edge')
   await page.getByRole('button', { name: '确认' }).click()
   await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(page.getByText('安装 Agent')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Windows' })).toBeVisible()
+  await expect(page.getByText('安装 Client Agent')).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Windows' })).toBeVisible()
+  await expect(page.locator('pre')).toContainText('--client-id')
 })
 
-test('failed node creation keeps the dialog open with an actionable error', async ({ page }) => {
-  await mockNodePage(page, 500)
-  await page.goto('/nodes')
-  await page.getByRole('button', { name: /添加节点/ }).click()
-  await page.getByLabel('节点 ID').fill('edge')
+test('failed Client creation keeps the dialog open with an actionable error', async ({ page }) => {
+  await mockClientPage(page, 500)
+  await page.goto('/clients')
+  await page.getByRole('button', { name: /添加 Client/ }).click()
+  await page.getByLabel('Client ID').fill('edge')
   await page.getByRole('button', { name: '确认' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await expect(page.getByRole('alert')).toContainText('database unavailable')
@@ -120,38 +118,73 @@ test('failed node creation keeps the dialog open with an actionable error', asyn
 test('successful server creation closes the dialog and shows standalone Compose', async ({ page }) => {
   await mockServerPage(page)
   await page.goto('/servers')
-  await page.getByRole('button', { name: /创建服务端/ }).click()
-  await page.getByLabel('服务端 ID').fill('edge')
-  await page.getByLabel('服务端 IP').fill('edge.example.com')
+  await page.getByRole('button', { name: /创建 Server/ }).click()
+  await page.getByLabel('Server ID').fill('edge')
+  await page.getByLabel('Server 公网地址').fill('edge.example.com')
   await page.getByRole('button', { name: '创建并生成部署文件' }).click()
   await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(page.getByText('部署 FRPS')).toBeVisible()
+  await expect(page.getByText('部署 Server（FRPS）')).toBeVisible()
   await expect(page.locator('pre')).toContainText('network_mode: host')
   await expect(page.locator('pre')).toContainText('one-use-token')
   await expect(page.locator('pre')).toContainText('PUBLIC_URL: "https://panel.example.com"')
 })
 
-test('a routed node can create and remove a TCP tunnel', async ({ page }) => {
+test('a Client can select any Server when creating and removing a TCP Tunnel', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('frp-panel.authenticated', '1'))
-  const tunnel = { name: 'web', nodeId: 'owner.c.mac', clientId: 'owner.c.mac@1', serverId: 'owner.s.edge', type: 'tcp', localHost: '127.0.0.1', localPort: 3000, remotePort: 8300, stopped: false }
+  const tunnel = { name: 'web', clientId: 'owner.c.mac', serverId: 'owner.s.edge', type: 'tcp', localHost: '127.0.0.1', localPort: 3000, remotePort: 8300, stopped: false }
   let tunnels: typeof tunnel[] = []
   await page.route('**/api/v1/client/list', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 200, body: { clients: [{ id: 'owner.c.mac' }] } }) }))
   await page.route('**/api/v1/server/list', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 200, body: { servers: [{ id: 'owner.s.edge', ip: 'edge.example.com' }] } }) }))
-  await page.route('**/api/v2/node-routes', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ routes: [{ nodeId: 'owner.c.mac', serverIds: ['owner.s.edge'] }] }) }))
   await page.route('**/api/v2/tunnels', async (route) => {
-    if (route.request().method() === 'POST') { tunnels = [tunnel]; await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(tunnel) }); return }
-    if (route.request().method() === 'DELETE') { tunnels = []; await route.fulfill({ status: 204, body: '' }); return }
+    if (route.request().method() === 'POST') {
+      expect(route.request().postDataJSON()).toMatchObject({ clientId: 'owner.c.mac', serverId: 'owner.s.edge' })
+      tunnels = [tunnel]
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(tunnel) }); return
+    }
+    if (route.request().method() === 'DELETE') {
+      expect(route.request().postDataJSON()).toMatchObject({ clientId: 'owner.c.mac', serverId: 'owner.s.edge' })
+      tunnels = []
+      await route.fulfill({ status: 204, body: '' }); return
+    }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ tunnels }) })
   })
   page.on('dialog', (dialog) => void dialog.accept())
   await page.goto('/tunnels')
-  await page.getByRole('button', { name: /创建隧道/ }).click()
-  await page.getByLabel('隧道名称').fill('web')
+  await page.getByRole('button', { name: /创建 Tunnel/ }).click()
+  await page.getByLabel('Tunnel 名称').fill('web')
   await page.getByLabel('本地端口').fill('3000')
   await page.getByLabel('公网端口').fill('8300')
   await page.getByRole('button', { name: '确认' }).click()
   await expect(page.getByRole('dialog')).toBeHidden()
   await expect(page.getByText('edge.example.com:8300')).toBeVisible()
   await page.getByRole('button', { name: '删除' }).click()
-  await expect(page.getByText('暂无隧道')).toBeVisible()
+  await expect(page.getByText('尚未创建 Tunnel')).toBeVisible()
+})
+
+test('account password change verifies both passwords and requires reauthentication', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('frp-panel.authenticated', '1'))
+  await page.route('**/api/v2/account', async (route) => {
+    if (route.request().method() === 'POST') {
+      expect(route.request().postDataJSON()).toEqual({ currentPassword: 'current-password', newPassword: 'new-password-123' })
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ reauthenticate: true }) })
+      return
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ username: 'owner', email: 'owner@example.com', role: 'owner' }) })
+  })
+  await page.route('**/api/v2/account/password', async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ currentPassword: 'current-password', newPassword: 'new-password-123' })
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ reauthenticate: true }) })
+  })
+  await page.route('**/api/v2/bootstrap-status', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ registrationEnabled: false, ownerExists: true, canCreateOwner: false }) }))
+  await page.goto('/account')
+  await expect(page.getByText('owner@example.com')).toBeVisible()
+  await expect(page.getByLabel('当前密码')).toHaveAttribute('autocomplete', 'current-password')
+  await expect(page.getByLabel('新密码')).toHaveAttribute('autocomplete', 'new-password')
+  await page.getByLabel('当前密码').fill('current-password')
+  await page.getByLabel('新密码').fill('new-password-123')
+  await page.getByLabel('确认密码').fill('new-password-123')
+  await page.getByRole('button', { name: '更新密码' }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByText('密码已更新，请使用新密码重新登录。')).toBeVisible()
+  expect(await page.evaluate(() => localStorage.getItem('frp-panel.authenticated'))).toBeNull()
 })

@@ -40,12 +40,12 @@ func Resolve(options ResolveOptions) (Config, error) {
 
 	result := Config{
 		Version:     ConfigVersion,
-		Controller:  Controller{APIURL: strings.TrimSpace(options.APIURL), RPCURL: strings.TrimSpace(options.RPCURL)},
+		Master:      Master{APIURL: strings.TrimSpace(options.APIURL), RPCURL: strings.TrimSpace(options.RPCURL)},
 		Credentials: Credentials{ServerID: strings.TrimSpace(options.FallbackID), Secret: options.FallbackSecret},
 		TLS:         TLS{InsecureSkipVerify: options.Insecure},
 	}
 	if options.EnrollmentToken != "" {
-		enrollment, err := Enroll(result.Controller.APIURL, options.EnrollmentToken, options.Insecure)
+		enrollment, err := Enroll(result.Master.APIURL, options.EnrollmentToken, options.Insecure)
 		if err != nil {
 			return Config{}, fmt.Errorf("enroll server: %w", err)
 		}
@@ -64,7 +64,7 @@ func Resolve(options ResolveOptions) (Config, error) {
 func Enroll(apiURL, token string, insecureSkipVerify bool) (EnrollmentResult, error) {
 	base, err := url.Parse(apiURL)
 	if err != nil || (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" {
-		return EnrollmentResult{}, fmt.Errorf("invalid controller API URL")
+		return EnrollmentResult{}, fmt.Errorf("invalid Master API URL")
 	}
 	base.Path = strings.TrimRight(base.Path, "/") + "/api/v2/server/enroll"
 	base.RawQuery = ""
@@ -106,7 +106,7 @@ func Enroll(apiURL, token string, insecureSkipVerify bool) (EnrollmentResult, er
 		return EnrollmentResult{}, fmt.Errorf("decode enrollment response: %w", err)
 	}
 	if result.ServerID == "" || result.Secret == "" {
-		return EnrollmentResult{}, fmt.Errorf("controller returned incomplete enrollment credentials")
+		return EnrollmentResult{}, fmt.Errorf("Master returned incomplete enrollment credentials")
 	}
 	return result, nil
 }

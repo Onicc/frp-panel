@@ -13,7 +13,7 @@ import (
 )
 
 func GetClientHandler(ctx *app.Context, req *pb.GetClientRequest) (*pb.GetClientResponse, error) {
-	logger.Logger(ctx).Infof("get client, req: [%+v]", req)
+	logger.Logger(ctx).Infof("get Client, client: [%s], server: [%s]", req.GetClientId(), req.GetServerId())
 
 	var (
 		userInfo = common.GetUserInfo(ctx)
@@ -50,7 +50,6 @@ func GetClientHandler(ctx *app.Context, req *pb.GetClientRequest) (*pb.GetClient
 
 		respCli = &pb.Client{
 			Id:        lo.ToPtr(client.ClientID),
-			Config:    lo.ToPtr(string(client.ConfigContent)),
 			ServerId:  lo.ToPtr(client.ServerID),
 			Stopped:   lo.ToPtr(client.Stopped),
 			Comment:   lo.ToPtr(client.Comment),
@@ -75,7 +74,6 @@ func GetClientHandler(ctx *app.Context, req *pb.GetClientRequest) (*pb.GetClient
 
 		respCli = &pb.Client{
 			Id:        lo.ToPtr(client.ClientID),
-			Config:    lo.ToPtr(string(client.ConfigContent)),
 			ServerId:  lo.ToPtr(client.ServerID),
 			Stopped:   lo.ToPtr(client.Stopped),
 			Comment:   lo.ToPtr(client.Comment),

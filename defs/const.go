@@ -79,7 +79,7 @@ const (
 
 const (
 	CurEnvPath = ".env"
-	SysEnvPath = "/etc/frp-panel/controller.env"
+	SysEnvPath = "/etc/frp-panel/master.env"
 )
 
 const (

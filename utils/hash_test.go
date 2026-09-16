@@ -22,7 +22,7 @@ func TestArgon2PasswordHash(t *testing.T) {
 }
 
 func TestMachineCredentialHashAndDerivation(t *testing.T) {
-	credential := DeriveCredential("controller-secret", "agent", "enrollment-token")
+	credential := DeriveCredential("master-secret", "agent", "enrollment-token")
 	if credential == "" || credential == DeriveCredential("other", "agent", "enrollment-token") {
 		t.Fatal("credential derivation is not keyed")
 	}

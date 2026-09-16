@@ -32,7 +32,7 @@ func main() {
 func newRootCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "frp-panel-agent",
-		Short:         "Cross-platform frp-panel node agent",
+		Short:         "Cross-platform frp-panel Client Agent",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -42,7 +42,7 @@ func newRootCommand() *cobra.Command {
 }
 
 func newAgentCommand() *cobra.Command {
-	agentCommand := &cobra.Command{Use: "agent", Short: "Run the node agent"}
+	agentCommand := &cobra.Command{Use: "agent", Short: "Run the Client Agent"}
 	run := &cobra.Command{
 		Use:   "run",
 		Short: "Run using a protected YAML configuration file",
@@ -98,11 +98,11 @@ func newServiceCommand() *cobra.Command {
 	}
 	install.Flags().String("root", "", "alternate filesystem root for packaging and safe verification")
 	install.Flags().String("config", "", "read an existing agent YAML file")
-	install.Flags().String("api-url", "", "controller public API URL")
-	install.Flags().String("rpc-url", "", "controller public agent RPC URL")
-	install.Flags().String("node-id", "", "node identifier")
-	install.Flags().String("enrollment-token", "", "short-lived controller enrollment token")
-	install.Flags().String("secret", "", "node credential; stored only in the protected config")
+	install.Flags().String("api-url", "", "Master public API URL")
+	install.Flags().String("rpc-url", "", "Master public Agent RPC URL")
+	install.Flags().String("client-id", "", "Client identifier")
+	install.Flags().String("enrollment-token", "", "short-lived Master enrollment token")
+	install.Flags().String("secret", "", "Client credential; stored only in the protected config")
 	install.Flags().Bool("insecure-skip-verify", false, "disable TLS verification (unsafe)")
 	install.Flags().Bool("enable-functions", false, "enable workerd functions when supported")
 	install.Flags().String("workerd-binary", "", "absolute path to an operator-installed workerd binary")
@@ -142,7 +142,7 @@ func configForInstall(cmd *cobra.Command, path string) (agent.Config, error) {
 	}
 	apiURL, _ := cmd.Flags().GetString("api-url")
 	rpcURL, _ := cmd.Flags().GetString("rpc-url")
-	nodeID, _ := cmd.Flags().GetString("node-id")
+	clientID, _ := cmd.Flags().GetString("client-id")
 	secret, _ := cmd.Flags().GetString("secret")
 	enrollmentToken, _ := cmd.Flags().GetString("enrollment-token")
 	insecure, _ := cmd.Flags().GetBool("insecure-skip-verify")
@@ -152,8 +152,8 @@ func configForInstall(cmd *cobra.Command, path string) (agent.Config, error) {
 	wireguard, _ := cmd.Flags().GetBool("enable-wireguard")
 	result := agent.Config{
 		Version:     agent.ConfigVersion,
-		Controller:  agent.Controller{APIURL: apiURL, RPCURL: rpcURL},
-		Credentials: agent.Credentials{NodeID: nodeID, Secret: secret},
+		Master:      agent.Master{APIURL: apiURL, RPCURL: rpcURL},
+		Credentials: agent.Credentials{ClientID: clientID, Secret: secret},
 		TLS:         agent.TLS{InsecureSkipVerify: insecure},
 		Features:    agent.Features{Functions: functions, WorkerdBinary: workerdBinary, RemoteShell: remoteShell, WireGuard: wireguard},
 	}
@@ -170,10 +170,10 @@ func configForInstall(cmd *cobra.Command, path string) (agent.Config, error) {
 			}
 			return agent.Config{}, fmt.Errorf("enroll agent: %w", err)
 		}
-		if !nodeIDMatchesEnrollment(nodeID, joined.NodeID) {
-			return agent.Config{}, fmt.Errorf("enrollment token belongs to a different node")
+		if !clientIDMatchesEnrollment(clientID, joined.ClientID) {
+			return agent.Config{}, fmt.Errorf("enrollment token belongs to a different Client")
 		}
-		result.Credentials.NodeID = joined.NodeID
+		result.Credentials.ClientID = joined.ClientID
 		result.Credentials.Secret = joined.Secret
 	}
 	return result, nil
@@ -184,12 +184,12 @@ func reuseExistingConfig(path string, requested agent.Config) (agent.Config, err
 	if err != nil {
 		return agent.Config{}, err
 	}
-	if requested.Credentials.NodeID == "" || !nodeIDMatchesEnrollment(requested.Credentials.NodeID, existing.Credentials.NodeID) {
-		return agent.Config{}, errors.New("installed configuration belongs to a different node")
+	if requested.Credentials.ClientID == "" || !clientIDMatchesEnrollment(requested.Credentials.ClientID, existing.Credentials.ClientID) {
+		return agent.Config{}, errors.New("installed configuration belongs to a different Client")
 	}
-	if !sameEndpoint(requested.Controller.APIURL, existing.Controller.APIURL) ||
-		!sameEndpoint(requested.Controller.RPCURL, existing.Controller.RPCURL) {
-		return agent.Config{}, errors.New("installed configuration belongs to a different controller")
+	if !sameEndpoint(requested.Master.APIURL, existing.Master.APIURL) ||
+		!sameEndpoint(requested.Master.RPCURL, existing.Master.RPCURL) {
+		return agent.Config{}, errors.New("installed configuration belongs to a different Master")
 	}
 	return existing, nil
 }
@@ -198,7 +198,7 @@ func sameEndpoint(left, right string) bool {
 	return left != "" && strings.TrimRight(left, "/") == strings.TrimRight(right, "/")
 }
 
-func nodeIDMatchesEnrollment(requested, enrolled string) bool {
+func clientIDMatchesEnrollment(requested, enrolled string) bool {
 	return requested == "" || enrolled == requested || strings.HasSuffix(enrolled, ".c."+requested)
 }
 

@@ -8,11 +8,11 @@ import (
 func validConfig() Config {
 	return Config{
 		Version: ConfigVersion,
-		Controller: Controller{
+		Master: Master{
 			APIURL: "https://panel.example.test",
 			RPCURL: "wss://panel.example.test",
 		},
-		Credentials: Credentials{NodeID: "owner.c.node", Secret: "secret"},
+		Credentials: Credentials{ClientID: "owner.c.client", Secret: "secret"},
 	}
 }
 
