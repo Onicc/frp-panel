@@ -67,6 +67,21 @@ func createEnrollment(appInstance app.Application) gin.HandlerFunc {
 		secret := utils.DeriveCredential(appInstance.GetConfig().App.GlobalSecret, "agent-node", token)
 		db := appInstance.GetDBManager().GetDefaultDB()
 		err = db.Transaction(func(tx *gorm.DB) error {
+			var previous models.AgentEnrollment
+			previousError := tx.Where("client_id = ?", globalID).First(&previous).Error
+			if previousError == nil {
+				if previous.UsedAt != nil {
+					return gorm.ErrDuplicatedKey
+				}
+				if err := tx.Delete(&previous).Error; err != nil {
+					return err
+				}
+				if err := tx.Unscoped().Where("client_id = ? AND user_id = ? AND tenant_id = ?", globalID, userInfo.GetUserID(), userInfo.GetTenantID()).Delete(&models.Client{}).Error; err != nil {
+					return err
+				}
+			} else if !errors.Is(previousError, gorm.ErrRecordNotFound) {
+				return previousError
+			}
 			client := &models.Client{ClientEntity: &models.ClientEntity{
 				ClientID: globalID, TenantID: userInfo.GetTenantID(), UserID: userInfo.GetUserID(),
 				ConnectSecret: utils.HashCredential(secret), IsShadow: true,

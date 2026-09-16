@@ -72,8 +72,8 @@ func PermissionsForRole(role string) []defs.APIPermission {
 	case defs.UserRole_Operator:
 		permissions = append(permissions,
 			defs.APIPermission{Method: "POST", Path: `^/api/v1/(client|server|frpc|frps|proxy|wg|worker)(/.*)?$`},
-			defs.APIPermission{Method: "POST", Path: `^/api/v2/(enrollments|server-enrollments|node-routes)$`},
-			defs.APIPermission{Method: "DELETE", Path: `^/api/v2/node-routes$`},
+			defs.APIPermission{Method: "POST", Path: `^/api/v2/(enrollments|server-enrollments|node-routes|tunnels)$`},
+			defs.APIPermission{Method: "DELETE", Path: `^/api/v2/(node-routes|tunnels)$`},
 		)
 	}
 	return permissions

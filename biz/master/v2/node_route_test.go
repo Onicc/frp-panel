@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -31,7 +32,7 @@ func TestNodeRouteCreatesDiscoverableManagedFRPC(t *testing.T) {
 	application.SetConfig(cfg)
 	application.SetClientsManager(rpc.NewClientsManager())
 	application.SetClientRecvMap(&sync.Map{})
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "routes.db")), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,6 +64,9 @@ func TestNodeRouteCreatesDiscoverableManagedFRPC(t *testing.T) {
 	router.POST("/api/v2/node-routes", createNodeRoute(application))
 	router.GET("/api/v2/node-routes", listNodeRoutes(application))
 	router.DELETE("/api/v2/node-routes", deleteNodeRoute(application))
+	router.POST("/api/v2/tunnels", createTunnel(application))
+	router.GET("/api/v2/tunnels", listTunnels(application))
+	router.DELETE("/api/v2/tunnels", deleteTunnel(application))
 	body, _ := json.Marshal(createNodeRouteRequest{NodeID: "owner.c.node", ServerID: "owner.s.edge"})
 
 	createRecorder := httptest.NewRecorder()
@@ -95,6 +99,38 @@ func TestNodeRouteCreatesDiscoverableManagedFRPC(t *testing.T) {
 	router.ServeHTTP(listRecorder, httptest.NewRequest(http.MethodGet, "/api/v2/node-routes", nil))
 	if listRecorder.Code != http.StatusOK || !strings.Contains(listRecorder.Body.String(), "owner.s.edge") {
 		t.Fatalf("list routes status = %d, body = %s", listRecorder.Code, listRecorder.Body.String())
+	}
+
+	tunnelBody, _ := json.Marshal(createTunnelRequest{
+		Name: "ssh", NodeID: "owner.c.node", ServerID: "owner.s.edge", Type: "tcp",
+		LocalHost: "127.0.0.1", LocalPort: 22, RemotePort: 6022,
+	})
+	tunnelRecorder := httptest.NewRecorder()
+	tunnelRequest := httptest.NewRequest(http.MethodPost, "/api/v2/tunnels", bytes.NewReader(tunnelBody))
+	tunnelRequest.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(tunnelRecorder, tunnelRequest)
+	if tunnelRecorder.Code != http.StatusCreated {
+		t.Fatalf("create tunnel status = %d, body = %s", tunnelRecorder.Code, tunnelRecorder.Body.String())
+	}
+	var proxyCount int64
+	if err := db.Model(&models.ProxyConfig{}).Where("origin_client_id = ? AND name = ?", "owner.c.node", "ssh").Count(&proxyCount).Error; err != nil || proxyCount != 1 {
+		t.Fatalf("created tunnel was not persisted: count=%d err=%v", proxyCount, err)
+	}
+	tunnelListRecorder := httptest.NewRecorder()
+	router.ServeHTTP(tunnelListRecorder, httptest.NewRequest(http.MethodGet, "/api/v2/tunnels", nil))
+	if tunnelListRecorder.Code != http.StatusOK || !strings.Contains(tunnelListRecorder.Body.String(), `"remotePort":6022`) {
+		t.Fatalf("list tunnels status = %d, body = %s", tunnelListRecorder.Code, tunnelListRecorder.Body.String())
+	}
+	tunnelDeleteBody, _ := json.Marshal(deleteTunnelRequest{Name: "ssh", NodeID: "owner.c.node", ServerID: "owner.s.edge"})
+	tunnelDeleteRecorder := httptest.NewRecorder()
+	tunnelDeleteRequest := httptest.NewRequest(http.MethodDelete, "/api/v2/tunnels", bytes.NewReader(tunnelDeleteBody))
+	tunnelDeleteRequest.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(tunnelDeleteRecorder, tunnelDeleteRequest)
+	if tunnelDeleteRecorder.Code != http.StatusNoContent {
+		t.Fatalf("delete tunnel status = %d, body = %s", tunnelDeleteRecorder.Code, tunnelDeleteRecorder.Body.String())
+	}
+	if err := db.Model(&models.ProxyConfig{}).Where("origin_client_id = ? AND name = ?", "owner.c.node", "ssh").Count(&proxyCount).Error; err != nil || proxyCount != 0 {
+		t.Fatalf("deleted tunnel remains: count=%d err=%v", proxyCount, err)
 	}
 
 	deleteRecorder := httptest.NewRecorder()

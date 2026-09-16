@@ -3,8 +3,7 @@ import { logout } from '../api'
 import { useI18n } from '../i18n'
 
 const nav = [
-  ['/', 'overview'], ['/nodes', 'nodes'], ['/servers', 'servers'], ['/tunnels', 'tunnels'], ['/networks', 'networks'],
-  ['/functions', 'functions'], ['/audit', 'audit'], ['/users', 'users'], ['/settings', 'settings'],
+  ['/', 'overview'], ['/nodes', 'nodes'], ['/servers', 'servers'], ['/tunnels', 'tunnels'],
 ] as const
 
 export function Layout() {

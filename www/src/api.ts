@@ -1,4 +1,5 @@
 const SESSION_KEY = 'frp-panel.authenticated'
+const SESSION_EVENT = 'frp-panel:session-change'
 
 type Envelope<T> = {
   code?: number
@@ -13,12 +14,31 @@ export class APIError extends Error {
   }
 }
 
+type RPCResult = { status?: { code?: number; message?: string } }
+const RPC_SUCCESS = 1
+
+function assertRPCSuccess(result: RPCResult, fallback: string, status: number): void {
+  if (result.status?.code !== RPC_SUCCESS) {
+    throw new APIError(result.status?.message || fallback, status)
+  }
+}
+
 export function sessionToken(): string {
   return localStorage.getItem(SESSION_KEY) ?? ''
 }
 
 export function clearSession(): void {
   localStorage.removeItem(SESSION_KEY)
+  window.dispatchEvent(new Event(SESSION_EVENT))
+}
+
+export function onSessionChange(listener: () => void): () => void {
+  window.addEventListener(SESSION_EVENT, listener)
+  window.addEventListener('storage', listener)
+  return () => {
+    window.removeEventListener(SESSION_EVENT, listener)
+    window.removeEventListener('storage', listener)
+  }
 }
 
 export async function logout(): Promise<void> {
@@ -43,24 +63,21 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
 }
 
 export async function login(username: string, password: string): Promise<void> {
-  const result = await request<{ status?: { code?: number; message?: string } }>('/api/v1/auth/login', {
+  const result = await request<RPCResult>('/api/v1/auth/login', {
     method: 'POST',
     body: JSON.stringify({ username, password }),
   })
-  if (result.status?.code !== undefined && result.status.code !== 0) {
-    throw new APIError(result.status?.message || 'Login failed', 401)
-  }
+  assertRPCSuccess(result, 'Login failed', 401)
   localStorage.setItem(SESSION_KEY, '1')
+  window.dispatchEvent(new Event(SESSION_EVENT))
 }
 
 export async function register(username: string, email: string, password: string): Promise<void> {
-  const result = await request<{ status?: { code?: number; message?: string } }>('/api/v1/auth/register', {
+  const result = await request<RPCResult>('/api/v1/auth/register', {
     method: 'POST',
     body: JSON.stringify({ username, email, password }),
   })
-  if (result.status?.code !== undefined && result.status.code !== 0) {
-    throw new APIError(result.status.message || 'Registration failed', 400)
-  }
+  assertRPCSuccess(result, 'Registration failed', 400)
 }
 
 export function post<T>(path: string, body: unknown = {}): Promise<T> {

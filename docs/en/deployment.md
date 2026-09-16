@@ -27,11 +27,7 @@ services:
       APP_GLOBAL_SECRET: ${APP_GLOBAL_SECRET:?set a random 32+ character secret}
       APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-true}
       APP_ENABLE_REGISTER: ${APP_ENABLE_REGISTER:-false}
-      MASTER_API_HOST: ${PUBLIC_HOST:?set the public controller hostname}
-      MASTER_API_SCHEME: ${MASTER_API_SCHEME:-https}
-      MASTER_RPC_HOST: ${PUBLIC_HOST:?set the public controller hostname}
-      CLIENT_API_URL: ${CLIENT_API_URL:?set the public API URL used by managed components}
-      CLIENT_RPC_URL: ${CLIENT_RPC_URL:?set the public RPC URL used by managed components}
+      PUBLIC_URL: ${PUBLIC_URL:?set the single public controller URL, for example https://panel.example.com}
     ports:
       - "127.0.0.1:9000:9000"
     volumes:
@@ -55,20 +51,18 @@ APP_GLOBAL_SECRET=REPLACE_WITH_A_RANDOM_32_BYTE_OR_LONGER_SECRET
 APP_COOKIE_SECURE=true
 APP_ENABLE_REGISTER=true
 
-PUBLIC_HOST=panel.example.com
-MASTER_API_SCHEME=https
-CLIENT_API_URL=https://panel.example.com
-CLIENT_RPC_URL=wss://panel.example.com
+PUBLIC_URL=https://panel.example.com
 ```
 
 - Keep `APP_GLOBAL_SECRET` unchanged and private. It must contain at least 32 random bytes; changing or losing it invalidates existing credentials.
 - Enable registration only while creating the first Owner. Set `APP_ENABLE_REGISTER=false` immediately afterward and reapply the Compose configuration.
-- `PUBLIC_HOST` contains no scheme, port, or path.
-- `CLIENT_API_URL` and `CLIENT_RPC_URL` are the public endpoints actually reachable by every Server and Client. They are embedded in console-generated deployments.
+- `PUBLIC_URL` is the only public address to configure. It must be a complete `http://` or `https://` URL without a path; HTTPS automatically derives the `wss://` RPC endpoint.
 - With secure cookies enabled, terminate HTTPS at a reverse proxy that forwards Web, API, and WebSocket traffic to `127.0.0.1:9000`.
 - Pin a tested `v*` image tag in production; `edge` follows `main`.
 
 Master does not publish port `7000` or any tunnel remote port.
+
+The first visit to `PUBLIC_URL` automatically shows **Create the first owner account**. Enter the username, email, password, and confirmation; the console signs in automatically and uses standard browser password-manager fields. After confirming that the account can sign in again, set `APP_ENABLE_REGISTER=false` and re-apply the Compose configuration.
 
 ## 3. Deploy one or more Servers (FRPS)
 
@@ -94,12 +88,9 @@ services:
       - server
       - --config
       - /data/server.yaml
-      - --enrollment-token
-      - "ONE_TIME_TOKEN_FROM_MASTER"
-      - --api-url
-      - "https://panel.example.com"
-      - --rpc-url
-      - "wss://panel.example.com"
+    environment:
+      PUBLIC_URL: "https://panel.example.com"
+      SERVER_ENROLLMENT_TOKEN: "ONE_TIME_TOKEN_FROM_MASTER"
     volumes:
       - frp-panel-server-data:/data
 
@@ -122,8 +113,7 @@ services:
     command: ["server", "--config", "/data/server.yaml"]
     environment:
       SERVER_ENROLLMENT_TOKEN: ${SERVER_ENROLLMENT_TOKEN:-}
-      CLIENT_API_URL: ${CLIENT_API_URL:?set the Master API URL}
-      CLIENT_RPC_URL: ${CLIENT_RPC_URL:?set the Master RPC URL}
+      PUBLIC_URL: ${PUBLIC_URL:?set the single public Master URL}
     volumes:
       - frp-panel-server-data:/data
 
@@ -136,8 +126,7 @@ volumes:
 ```dotenv
 FRP_PANEL_IMAGE=onicc/frp-panel:edge
 SERVER_ENROLLMENT_TOKEN=ONE_TIME_TOKEN_FROM_MASTER
-CLIENT_API_URL=https://panel.example.com
-CLIENT_RPC_URL=wss://panel.example.com
+PUBLIC_URL=https://panel.example.com
 ```
 
 After the first successful enrollment, remove `SERVER_ENROLLMENT_TOKEN` from `.env`; restarts use the protected volume credential.
@@ -168,6 +157,8 @@ A newly installed Client does not connect to FRPS until Master assigns a route:
 3. Remove an unused route in the same column. An online Agent applies changes immediately; changes made while offline apply no later than the next configuration sync.
 
 The mapping is explicit per node and Server. Different Clients can use different FRPS hosts, one Client can use multiple FRPS hosts, and business traffic never passes through Master.
+
+After assigning a route, open **Tunnels → Create tunnel**, select that node and Server, then enter the TCP/UDP protocol, local address, local port, and public port. The public port listens on the selected FRPS and forwards to the service reachable from the Client host.
 
 ## 6. Ports and acceptance
 

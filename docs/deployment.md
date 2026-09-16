@@ -36,11 +36,7 @@ services:
       APP_GLOBAL_SECRET: ${APP_GLOBAL_SECRET:?set a random 32+ character secret}
       APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-true}
       APP_ENABLE_REGISTER: ${APP_ENABLE_REGISTER:-false}
-      MASTER_API_HOST: ${PUBLIC_HOST:?set the public controller hostname}
-      MASTER_API_SCHEME: ${MASTER_API_SCHEME:-https}
-      MASTER_RPC_HOST: ${PUBLIC_HOST:?set the public controller hostname}
-      CLIENT_API_URL: ${CLIENT_API_URL:?set the public API URL used by managed components}
-      CLIENT_RPC_URL: ${CLIENT_RPC_URL:?set the public RPC URL used by managed components}
+      PUBLIC_URL: ${PUBLIC_URL:?set the single public controller URL, for example https://panel.example.com}
     ports:
       - "127.0.0.1:9000:9000"
     volumes:
@@ -64,22 +60,20 @@ APP_GLOBAL_SECRET=REPLACE_WITH_A_RANDOM_32_BYTE_OR_LONGER_SECRET
 APP_COOKIE_SECURE=true
 APP_ENABLE_REGISTER=true
 
-PUBLIC_HOST=panel.example.com
-MASTER_API_SCHEME=https
-CLIENT_API_URL=https://panel.example.com
-CLIENT_RPC_URL=wss://panel.example.com
+PUBLIC_URL=https://panel.example.com
 ```
 
 配置要求：
 
 - `APP_GLOBAL_SECRET` 必须是唯一的高强度随机值，至少 32 字节；需要长期保存，丢失或变更会使现有凭据失效。
 - `APP_ENABLE_REGISTER` 只在创建首个 Owner 时设为 `true`，创建后立即改为 `false` 并重新应用 Compose 配置。
-- `PUBLIC_HOST` 只填写域名或公网 IP，不包含协议、端口和路径。
-- `CLIENT_API_URL`、`CLIENT_RPC_URL` 是 Server 和 Client 实际访问 Master 的公网地址，也会进入控制台生成的部署内容。
+- `PUBLIC_URL` 是唯一需要配置的公开地址，必须是无路径的完整 `http://` 或 `https://` URL。HTTPS 会自动派生 `wss://` RPC 地址。
 - 使用 `APP_COOKIE_SECURE=true` 时，浏览器入口必须是 HTTPS；推荐让同机反向代理转发至 `127.0.0.1:9000`，并支持 WebSocket。
 - `edge` 会随 `main` 更新；生产环境应固定到已验证的 `v*` 镜像标签。
 
 Master 只需开放 Web/API/RPC 入口，不应映射 `7000` 或任何业务 remote port。
+
+首次打开 `PUBLIC_URL` 时会自动显示“创建首个所有者账户”：填写用户名、邮箱、密码和确认密码后，页面会自动登录并进入控制台，浏览器也能按标准登录表单识别并保存凭据。确认可以重新登录后，将 `APP_ENABLE_REGISTER` 改为 `false` 并重新应用 Compose 配置。
 
 ## 3. 部署一个或多个 Server（FRPS）
 
@@ -105,12 +99,9 @@ services:
       - server
       - --config
       - /data/server.yaml
-      - --enrollment-token
-      - "ONE_TIME_TOKEN_FROM_MASTER"
-      - --api-url
-      - "https://panel.example.com"
-      - --rpc-url
-      - "wss://panel.example.com"
+    environment:
+      PUBLIC_URL: "https://panel.example.com"
+      SERVER_ENROLLMENT_TOKEN: "ONE_TIME_TOKEN_FROM_MASTER"
     volumes:
       - frp-panel-server-data:/data
 
@@ -139,8 +130,7 @@ services:
     command: ["server", "--config", "/data/server.yaml"]
     environment:
       SERVER_ENROLLMENT_TOKEN: ${SERVER_ENROLLMENT_TOKEN:-}
-      CLIENT_API_URL: ${CLIENT_API_URL:?set the Master API URL}
-      CLIENT_RPC_URL: ${CLIENT_RPC_URL:?set the Master RPC URL}
+      PUBLIC_URL: ${PUBLIC_URL:?set the single public Master URL}
     volumes:
       - frp-panel-server-data:/data
 
@@ -153,8 +143,7 @@ volumes:
 ```dotenv
 FRP_PANEL_IMAGE=onicc/frp-panel:edge
 SERVER_ENROLLMENT_TOKEN=ONE_TIME_TOKEN_FROM_MASTER
-CLIENT_API_URL=https://panel.example.com
-CLIENT_RPC_URL=wss://panel.example.com
+PUBLIC_URL=https://panel.example.com
 ```
 
 首次注册成功后可从 `.env` 删除 `SERVER_ENROLLMENT_TOKEN`；重启会直接读取数据卷中的受保护凭据。
@@ -187,6 +176,8 @@ Client 上线后默认不连接任何 FRPS，必须由 Master 指定链路：
 3. 不再需要的链路可在同一位置移除；在线节点会立即应用变更，离线期间的变更最迟在下一次配置同步时生效。
 
 Master 保存的是“节点 + Server”的明确映射，因此不同 Client 可以选择不同 FRPS，同一个 Client 也可以连接多个 FRPS。隧道配置必须引用目标节点和目标 Server；业务流量不会经过 Master。
+
+分配链路后，打开 **隧道 → 创建隧道**，选择对应节点和 Server，填写 TCP/UDP、本地地址、本地端口及公网端口。公网端口监听在所选 FRPS 上，并转发至 Client 所在机器能够访问的本地服务。
 
 ## 6. 网络端口
 

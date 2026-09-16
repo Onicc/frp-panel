@@ -22,6 +22,7 @@ func Configure(router *gin.RouterGroup, appInstance app.Application) {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "time": time.Now().UTC(), "protocol": protocol.Version})
 	})
+	router.GET("/bootstrap-status", bootstrapStatus(appInstance))
 	router.POST("/agent/enroll", middleware.LoginRateLimit(), redeemEnrollment(appInstance))
 	router.POST("/server/enroll", middleware.LoginRateLimit(), redeemServerEnrollment(appInstance))
 	protected := router.Group("", middleware.JWTAuth(appInstance), middleware.AuthCtx(appInstance), middleware.RBAC(appInstance))
@@ -36,6 +37,9 @@ func Configure(router *gin.RouterGroup, appInstance app.Application) {
 	protected.GET("/node-routes", listNodeRoutes(appInstance))
 	protected.POST("/node-routes", createNodeRoute(appInstance))
 	protected.DELETE("/node-routes", deleteNodeRoute(appInstance))
+	protected.GET("/tunnels", listTunnels(appInstance))
+	protected.POST("/tunnels", createTunnel(appInstance))
+	protected.DELETE("/tunnels", deleteTunnel(appInstance))
 }
 
 func AbortProblem(c *gin.Context, status int, title, detail string) {

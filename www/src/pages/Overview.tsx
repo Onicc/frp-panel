@@ -19,7 +19,7 @@ export default function Overview() {
   return <>
     <header className="page-header"><div><span className="eyebrow">frp-panel v2</span><h1>{t('overview')}</h1><p>{t('capabilityHint')}</p></div><span className="health"><i />{t('online')}</span></header>
     <section className="stats-grid">
-      <article><span>{t('nodes')}</span><strong>{stats.nodes}</strong><small>FRPC / FRPS agents</small></article>
+      <article><span>{t('nodes')}</span><strong>{stats.nodes}</strong><small>Managed FRPC agents</small></article>
       <article><span>{t('servers')}</span><strong>{stats.servers}</strong><small>Managed ingress</small></article>
       <article><span>{t('tunnels')}</span><strong>{stats.tunnels}</strong><small>Desired state</small></article>
     </section>

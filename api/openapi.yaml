@@ -24,6 +24,22 @@ paths:
                   status: { const: ok }
                   time: { type: string, format: date-time }
                   protocol: { const: '2' }
+  /bootstrap-status:
+    get:
+      operationId: getBootstrapStatus
+      security: []
+      responses:
+        '200':
+          description: Minimal first-run state used to select setup or login UI.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [registrationEnabled, ownerExists, canCreateOwner]
+                properties:
+                  registrationEnabled: { type: boolean }
+                  ownerExists: { type: boolean }
+                  canCreateOwner: { type: boolean }
   /capabilities:
     get:
       operationId: getCapabilities
@@ -188,6 +204,60 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /tunnels:
+    get:
+      operationId: listTunnels
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Managed TCP and UDP tunnels.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tunnels]
+                properties:
+                  tunnels:
+                    type: array
+                    items: { $ref: '#/components/schemas/Tunnel' }
+        '401': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createTunnel
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TunnelMutation' }
+      responses:
+        '201':
+          description: Tunnel saved and pushed to the managed node when online.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tunnel' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteTunnel
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, nodeId, serverId]
+              properties:
+                name: { type: string }
+                nodeId: { type: string }
+                serverId: { type: string }
+      responses:
+        '204': { description: Tunnel removed. }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearerAuth:
@@ -227,6 +297,30 @@ components:
       properties:
         nodeId: { type: string }
         serverId: { type: string }
+    Tunnel:
+      type: object
+      required: [name, nodeId, clientId, serverId, type, localHost, localPort, remotePort, stopped]
+      properties:
+        name: { type: string }
+        nodeId: { type: string }
+        clientId: { type: string }
+        serverId: { type: string }
+        type: { type: string, enum: [tcp, udp] }
+        localHost: { type: string }
+        localPort: { type: integer, minimum: 1, maximum: 65535 }
+        remotePort: { type: integer, minimum: 1024, maximum: 65535 }
+        stopped: { type: boolean }
+    TunnelMutation:
+      type: object
+      required: [name, nodeId, serverId, type, localPort, remotePort]
+      properties:
+        name: { type: string, pattern: '^[A-Za-z0-9_-]+$' }
+        nodeId: { type: string }
+        serverId: { type: string }
+        type: { type: string, enum: [tcp, udp] }
+        localHost: { type: string, default: 127.0.0.1 }
+        localPort: { type: integer, minimum: 1, maximum: 65535 }
+        remotePort: { type: integer, minimum: 1024, maximum: 65535 }
     Problem:
       type: object
       required: [type, title, status]

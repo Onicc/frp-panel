@@ -32,6 +32,7 @@ export default function Nodes() {
 
   const refresh = useCallback(async () => {
     setLoading(true)
+    setRouteError('')
     try {
       const [clientList, serverList, routeList] = await Promise.all([
         post<ClientList>('/api/v1/client/list', { page: 1, pageSize: 100 }),
@@ -49,6 +50,8 @@ export default function Nodes() {
       }))
       setServers(serverList.servers ?? [])
       setRoutes(Object.fromEntries((routeList.routes ?? []).map((route) => [route.nodeId, route.serverIds])))
+    } catch (cause) {
+      setRouteError(cause instanceof Error ? cause.message : String(cause))
     } finally { setLoading(false) }
   }, [])
 
@@ -57,6 +60,10 @@ export default function Nodes() {
   async function createEnrollment() {
     const result = await post<Enrollment>('/api/v2/enrollments', { nodeId })
     setInstall(result)
+    setNodes((current) => current.some((node) => (node.id ?? node.clientId) === result.nodeId)
+      ? current
+      : [...current, { id: result.nodeId, online: false }])
+    setRoutes((current) => ({ ...current, [result.nodeId]: current[result.nodeId] ?? [] }))
     setNodeId('')
   }
 
@@ -64,7 +71,11 @@ export default function Nodes() {
     const serverId = routeDrafts[id]
     if (!serverId) return
     setRouteError('')
-    try { await post('/api/v2/node-routes', { nodeId: id, serverId }); await refresh() }
+    try {
+      await post('/api/v2/node-routes', { nodeId: id, serverId })
+      setRoutes((current) => ({ ...current, [id]: [...new Set([...(current[id] ?? []), serverId])] }))
+      setRouteDrafts((current) => ({ ...current, [id]: '' }))
+    }
     catch (cause) { setRouteError(cause instanceof Error ? cause.message : String(cause)) }
   }
 
@@ -72,7 +83,7 @@ export default function Nodes() {
     setRouteError('')
     try {
       await request('/api/v2/node-routes', { method: 'DELETE', body: JSON.stringify({ nodeId: node, serverId: server }) })
-      await refresh()
+      setRoutes((current) => ({ ...current, [node]: (current[node] ?? []).filter((id) => id !== server) }))
     } catch (cause) { setRouteError(cause instanceof Error ? cause.message : String(cause)) }
   }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -17,7 +18,8 @@ import (
 )
 
 type Config struct {
-	App struct {
+	PublicURL string `env:"PUBLIC_URL" env-description:"single public http(s) URL used by the controller and managed components"`
+	App       struct {
 		UseGvisorNet   bool   `env:"USE_GVISOR_NET" env-default:"false" env-description:"use gvisor netstack for TUN device"`
 		GlobalSecret   string `env:"GLOBAL_SECRET" env-description:"at least 32 random characters; used to derive signing keys"`
 		CookieAge      int    `env:"COOKIE_AGE" env-default:"86400" env-description:"cookie age in second, default is 1 day"`
@@ -107,7 +109,9 @@ func NewConfig() Config {
 	if err = cleanenv.ReadEnv(&cfg); err != nil {
 		logger.Logger(ctx).Panic(err)
 	}
-	cfg.Complete()
+	if err := cfg.Complete(); err != nil {
+		logger.Logger(ctx).Panic(err)
+	}
 
 	if !cfg.IsDebug {
 		gin.SetMode(gin.ReleaseMode)
@@ -141,7 +145,10 @@ func DefaultConfig() Config {
 	return cfg
 }
 
-func (cfg *Config) Complete() {
+func (cfg *Config) Complete() error {
+	if err := cfg.applyPublicURL(); err != nil {
+		return err
+	}
 	if len(cfg.Master.APIHost) == 0 {
 		cfg.Master.APIHost = cfg.Master.RPCHost
 	}
@@ -170,6 +177,34 @@ func (cfg *Config) Complete() {
 			cfg.Client.Worker.WorkerdBinaryPath = w[0]
 		}
 	}
+	return nil
+}
+
+func (cfg *Config) applyPublicURL() error {
+	value := strings.TrimSpace(cfg.PublicURL)
+	if value == "" {
+		return nil
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return fmt.Errorf("PUBLIC_URL must be an absolute http(s) URL")
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
+		return fmt.Errorf("PUBLIC_URL must not contain credentials, a path, query, or fragment")
+	}
+	parsed.Path = ""
+	cfg.PublicURL = strings.TrimRight(parsed.String(), "/")
+	cfg.Master.APIHost = parsed.Hostname()
+	cfg.Master.APIScheme = parsed.Scheme
+	cfg.Master.RPCHost = parsed.Hostname()
+	cfg.Client.APIUrl = cfg.PublicURL
+	if parsed.Scheme == "https" {
+		parsed.Scheme = "wss"
+	} else {
+		parsed.Scheme = "ws"
+	}
+	cfg.Client.RPCUrl = strings.TrimRight(parsed.String(), "/")
+	return nil
 }
 
 func (cfg Config) PrintStr() string {
