@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -159,6 +160,14 @@ func configForInstall(cmd *cobra.Command, path string) (agent.Config, error) {
 	if enrollmentToken != "" {
 		joined, err := agent.Enroll(apiURL, enrollmentToken, insecure)
 		if err != nil {
+			root, _ := cmd.Flags().GetString("root")
+			layout, layoutErr := agentservice.LayoutFor(runtime.GOOS, root, os.Getenv)
+			if layoutErr == nil {
+				if existing, reuseErr := reuseExistingConfig(layout.Config, result); reuseErr == nil {
+					fmt.Fprintf(os.Stderr, "enrollment could not be repeated; reusing the matching protected configuration at %s\n", layout.Config)
+					return existing, nil
+				}
+			}
 			return agent.Config{}, fmt.Errorf("enroll agent: %w", err)
 		}
 		if !nodeIDMatchesEnrollment(nodeID, joined.NodeID) {
@@ -168,6 +177,25 @@ func configForInstall(cmd *cobra.Command, path string) (agent.Config, error) {
 		result.Credentials.Secret = joined.Secret
 	}
 	return result, nil
+}
+
+func reuseExistingConfig(path string, requested agent.Config) (agent.Config, error) {
+	existing, err := agent.ReadConfig(path)
+	if err != nil {
+		return agent.Config{}, err
+	}
+	if requested.Credentials.NodeID == "" || !nodeIDMatchesEnrollment(requested.Credentials.NodeID, existing.Credentials.NodeID) {
+		return agent.Config{}, errors.New("installed configuration belongs to a different node")
+	}
+	if !sameEndpoint(requested.Controller.APIURL, existing.Controller.APIURL) ||
+		!sameEndpoint(requested.Controller.RPCURL, existing.Controller.RPCURL) {
+		return agent.Config{}, errors.New("installed configuration belongs to a different controller")
+	}
+	return existing, nil
+}
+
+func sameEndpoint(left, right string) bool {
+	return left != "" && strings.TrimRight(left, "/") == strings.TrimRight(right, "/")
 }
 
 func nodeIDMatchesEnrollment(requested, enrolled string) bool {

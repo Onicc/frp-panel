@@ -2,7 +2,9 @@ package agentservice
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -89,5 +91,39 @@ func TestServiceDefinitionsDoNotExposeCredentials(t *testing.T) {
 		if !strings.Contains(text, "--config") || strings.Contains(text, "--secret") {
 			t.Fatalf("unsafe service definition: %s", text)
 		}
+		if goos == "linux" {
+			if strings.Contains(text, "\nGroup=") {
+				t.Fatalf("systemd must use the account's primary group: %s", text)
+			}
+			if strings.Contains(text, `ExecStart="`) || strings.Contains(text, `WorkingDirectory="`) {
+				t.Fatalf("systemd paths must use native directive syntax: %s", text)
+			}
+		}
+	}
+}
+
+func TestLinuxServiceDefinitionPassesSystemdAnalyze(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("systemd validation requires Linux")
+	}
+	analyzer, err := exec.LookPath("systemd-analyze")
+	if err != nil {
+		t.Skip("systemd-analyze is not installed")
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout, err := Install(InstallOptions{
+		GOOS:       "linux",
+		Root:       t.TempDir(),
+		Executable: executable,
+		Config:     []byte("version: 2\n"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command(analyzer, "verify", layout.ServiceFile).CombinedOutput(); err != nil {
+		t.Fatalf("systemd-analyze verify: %v\n%s", err, output)
 	}
 }

@@ -42,6 +42,16 @@ Restart-Service frp-panel-agent
 
 `uninstall` preserves configuration and state unless `--purge` is explicit. Updates retain the previous binary and roll back a failed replacement.
 
+## Recovering a failed Linux installation
+
+The enrollment token is redeemed before the service starts. If the command wrote `/etc/frp-panel/agent.yaml` and then failed while installing or starting systemd, keep that file and rerun the original installation command. When the token cannot be redeemed again, the installer reuses the protected configuration only if both its node ID and Master endpoints match. If the original command is no longer available, repair the installation from the existing configuration:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Onicc/frp-panel/main/install.sh | sudo bash -s -- --config /etc/frp-panel/agent.yaml
+```
+
+Do not run `uninstall --purge` first. Purging removes the node credential, so a new node and installation command must then be created in Master.
+
 Apple notarization and Windows Authenticode are not provided yet. Verify downloads against `checksums.txt` from the GitHub Release before stable deployments.
 
 The bootstrap and `update` default to the rolling `edge` release. Production should pass an evaluated `v*` tag explicitly, or use `--version latest` for the latest stable release.

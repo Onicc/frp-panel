@@ -131,15 +131,14 @@ Wants=network-online.target
 [Service]
 Type=simple
 User={{.ServiceUser}}
-Group={{.ServiceUser}}
-ExecStart={{quote .Binary}} agent run --config {{quote .Config}}
-WorkingDirectory={{quote .Data}}
+ExecStart={{.Binary}} agent run --config {{.Config}}
+WorkingDirectory={{.Data}}
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths={{quote .Data}}
+ReadWritePaths={{.Data}}
 
 [Install]
 WantedBy=multi-user.target
@@ -163,7 +162,6 @@ WantedBy=multi-user.target
 		return nil, fmt.Errorf("%s uses the native service manager and has no definition file", layout.GOOS)
 	}
 	tmpl, err := template.New("service").Funcs(template.FuncMap{
-		"quote": func(v string) string { return `"` + strings.ReplaceAll(v, `"`, `\"`) + `"` },
 		"xml": func(v string) string {
 			var b bytes.Buffer
 			template.HTMLEscape(&b, []byte(v))
@@ -237,6 +235,11 @@ func installNative(layout Layout, start bool) error {
 	var commands [][]string
 	switch layout.GOOS {
 	case "linux":
+		if analyzer, err := exec.LookPath("systemd-analyze"); err == nil {
+			if output, err := exec.Command(analyzer, "verify", layout.ServiceFile).CombinedOutput(); err != nil {
+				return fmt.Errorf("validate systemd service definition: %w: %s", err, strings.TrimSpace(string(output)))
+			}
+		}
 		commands = append(commands, []string{"systemctl", "daemon-reload"}, []string{"systemctl", "enable", ServiceName})
 		if start {
 			commands = append(commands, []string{"systemctl", "restart", ServiceName})
@@ -258,7 +261,13 @@ func installNative(layout Layout, start bool) error {
 	}
 	for _, command := range commands {
 		if output, err := exec.Command(command[0], command[1:]...).CombinedOutput(); err != nil {
-			return fmt.Errorf("%s: %w: %s", command[0], err, strings.TrimSpace(string(output)))
+			detail := strings.TrimSpace(string(output))
+			if layout.GOOS == "linux" && command[0] == "systemctl" {
+				if status, statusErr := exec.Command("systemctl", "status", "--no-pager", "--full", ServiceName).CombinedOutput(); statusErr == nil || len(status) > 0 {
+					detail = strings.TrimSpace(detail + "\n\n" + string(status))
+				}
+			}
+			return fmt.Errorf("%s: %w: %s", command[0], err, detail)
 		}
 	}
 	return nil
