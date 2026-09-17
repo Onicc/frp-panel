@@ -4,6 +4,7 @@ import (
 	"github.com/Onicc/frp-panel/models"
 	"github.com/Onicc/frp-panel/pb"
 	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/services/dao"
 	"github.com/samber/lo"
 )
 
@@ -14,6 +15,7 @@ func RPCPullConfig(ctx *app.Context, req *pb.PullServerConfigReq) (*pb.PullServe
 	if cli, err = ValidateServerRequest(ctx, req.GetBase()); err != nil {
 		return nil, err
 	}
+	_ = dao.NewMutation(ctx).AdminUpdateServerLastSeen(cli.ServerID)
 
 	return &pb.PullServerConfigResp{
 		Server: &pb.Server{

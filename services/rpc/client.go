@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/Onicc/frp-panel/common"
 	"github.com/Onicc/frp-panel/pb"
@@ -29,9 +30,22 @@ func CallClientWrapper[R common.RespType](c *app.Context, clientID string, event
 }
 
 func CallClient(ctx *app.Context, clientID string, event pb.Event, msg proto.Message) (*pb.ClientMessage, error) {
-	sender := ctx.GetApp().GetClientsManager().Get(clientID)
+	requestCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return CallClientWithContext(ctx, requestCtx, clientID, event, msg)
+}
+
+// CallClientWithContext is the bounded variant used by status/reconciliation
+// paths. The legacy CallClient entry point keeps the existing application
+// context semantics while still inheriting a finite timeout.
+func CallClientWithContext(appCtx *app.Context, requestCtx context.Context, clientID string, event pb.Event, msg proto.Message) (*pb.ClientMessage, error) {
+	manager := appCtx.GetApp().GetClientsManager()
+	if manager == nil {
+		return nil, fmt.Errorf("client manager is unavailable")
+	}
+	sender := manager.Get(clientID)
 	if sender == nil {
-		logger.Logger(ctx).Errorf("cannot get client, id: [%s]", clientID)
+		logger.Logger(appCtx).Errorf("cannot get client, id: [%s]", clientID)
 		return nil, fmt.Errorf("cannot get client, id: [%s]", clientID)
 	}
 
@@ -48,43 +62,58 @@ func CallClient(ctx *app.Context, clientID string, event pb.Event, msg proto.Mes
 		ClientId:  clientID,
 	}
 
-	ctx.GetApp().GetClientRecvMap().Store(req.SessionId, make(chan *pb.ClientMessage))
+	responseChannel := make(chan *pb.ClientMessage, 1)
+	appInstance := appCtx.GetApp()
+	appInstance.GetClientRecvMap().Store(req.SessionId, responseChannel)
+	defer appInstance.GetClientRecvMap().Delete(req.SessionId)
 	err = sender.Conn.Send(req)
 	if err != nil {
 		logger.Logger(context.Background()).WithError(err).Errorf("cannot send")
-		ctx.GetApp().GetClientsManager().Remove(clientID)
+		manager.Remove(clientID)
 		return nil, err
 	}
-	respChAny, ok := ctx.GetApp().GetClientRecvMap().Load(req.SessionId)
+	respChAny, ok := appInstance.GetClientRecvMap().Load(req.SessionId)
 	if !ok {
-		logger.Logger(ctx).Fatalf("cannot load")
+		logger.Logger(appCtx).Errorf("cannot load response channel")
+		return nil, fmt.Errorf("response channel unavailable")
 	}
 
 	respCh, ok := respChAny.(chan *pb.ClientMessage)
 	if !ok {
-		logger.Logger(ctx).Fatalf("cannot cast")
+		logger.Logger(appCtx).Errorf("cannot cast response channel")
+		return nil, fmt.Errorf("response channel has invalid type")
 	}
 
-	resp := <-respCh
-	if resp.Event == pb.Event_EVENT_ERROR {
-		return nil, fmt.Errorf("client return error: %s", resp.Data)
+	if requestCtx == nil {
+		requestCtx = context.Background()
 	}
-
-	close(respCh)
-	ctx.GetApp().GetClientRecvMap().Delete(req.SessionId)
-	return resp, nil
+	select {
+	case resp := <-respCh:
+		if resp.Event == pb.Event_EVENT_ERROR {
+			return nil, fmt.Errorf("client return error: %s", resp.Data)
+		}
+		return resp, nil
+	case <-requestCtx.Done():
+		return nil, requestCtx.Err()
+	}
 }
 
 func Recv(appInstance app.Application, clientID string) chan bool {
-	done := make(chan bool)
+	done := make(chan bool, 1)
 	go func() {
 		c := context.Background()
 		log := logger.Logger(c).WithField("clientID", clientID)
+		manager := appInstance.GetClientsManager()
+		if manager == nil {
+			done <- true
+			return
+		}
 		for {
-			reciver := appInstance.GetClientsManager().Get(clientID)
+			reciver := manager.Get(clientID)
 			if reciver == nil {
-				log.Errorf("cannot get client")
-				continue
+				log.Errorf("cannot get client; ending receive loop")
+				done <- true
+				return
 			}
 			resp, err := reciver.Conn.Recv()
 			if err == io.EOF {

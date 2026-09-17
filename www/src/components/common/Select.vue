@@ -1,0 +1,2 @@
+<template><label><span v-if="label">{{ label }}<em v-if="required"> *</em></span><select v-bind="$attrs" :required="required" :value="modelValue" @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)"><slot /></select></label></template>
+<script setup lang="ts">defineOptions({inheritAttrs:false}); withDefaults(defineProps<{modelValue?:string|number;label?:string;required?:boolean}>(),{modelValue:'',required:false}); const emit=defineEmits<{ 'update:modelValue':[value:string] }>()</script>

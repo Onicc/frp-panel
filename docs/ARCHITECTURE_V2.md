@@ -21,4 +21,8 @@ After enrollment, Servers pull FRPS configuration and Client Agents pull the int
 
 ## Web console contract
 
-The console is a Vite/React SPA. Mutation dialogs share one contract: success resets the form, closes the dialog, and refreshes the resource; failure keeps the dialog open and displays the server's RFC 9457 problem detail. The same behavior is covered by component and browser tests.
+The console is a Vue 3/Vite SPA. Its layout and common primitives are adapted
+only from the sub2api component set (see the frontend attribution notice).
+Mutation dialogs share one contract: success resets the form, closes the dialog,
+and refreshes the resource; failure keeps the dialog open and displays the
+server's RFC 9457 problem detail.

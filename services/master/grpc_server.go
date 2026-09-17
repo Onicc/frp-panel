@@ -151,12 +151,16 @@ func (s *server) ServerSend(sender pb.Master_ServerSendServer) error {
 	for {
 		req, err := sender.Recv()
 		if err == io.EOF {
-			logger.Logger(ctx).Infof("finish server send, client id: [%s]", req.GetClientId())
+			logger.Logger(ctx).Info("finish server send")
 			return nil
 		}
 
 		if err != nil {
-			logger.Logger(context.Background()).WithError(err).Errorf("cannot recv from client, id: [%s]", req.GetClientId())
+			clientID := ""
+			if req != nil {
+				clientID = req.GetClientId()
+			}
+			logger.Logger(context.Background()).WithError(err).Errorf("cannot recv from client, id: [%s]", clientID)
 			return err
 		}
 
@@ -212,6 +216,10 @@ func (s *server) ServerSend(sender pb.Master_ServerSendServer) error {
 			if cliType == defs.CliTypeClient {
 				if err := dao.NewMutation(ctx).AdminUpdateClientLastSeen(req.GetClientId()); err != nil {
 					logger.Logger(ctx).Errorf("cannot update client last seen, %s id: [%s]", req.GetEvent().String(), req.GetClientId())
+				}
+			} else if cliType == defs.CliTypeServer {
+				if err := dao.NewMutation(ctx).AdminUpdateServerLastSeen(req.GetClientId()); err != nil {
+					logger.Logger(ctx).Errorf("cannot update server last seen, %s id: [%s]", req.GetEvent().String(), req.GetClientId())
 				}
 			}
 

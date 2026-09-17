@@ -9,7 +9,7 @@
 - Master 控制面、可独立部署的 Server（FRPS）数据面与轻量 Client Agent `frp-panel-agent` 相互分离。
 - Agent 支持 Linux、macOS、Windows 的 amd64/arm64 主流平台。
 - 安装命令写入系统规范目录，不再污染执行命令时的当前目录。
-- 使用 Vite 8 / React 19 重写中英文控制台；创建、编辑成功后统一关闭并重置弹窗，失败时保留现场。
+- 使用 Vue 3 / Vite 重写中英文控制台；只使用 sub2api 中的布局、表格、表单和对话框基础组件，成功后统一关闭并重置弹窗，失败时保留现场。
 - 安全默认值：校验 TLS、关闭高权限功能、Argon2id 密码、按角色签发权限、同源 WebSocket、0600 Agent 配置。
 - 发布 `onicc/frp-panel` 与 `onicc/frp-panel-agent` 两个多架构镜像。
 - 发布物包含 SHA-256、SBOM、GitHub provenance，Actions 均固定到提交 SHA。

@@ -74,7 +74,7 @@ func createServerEnrollment(appInstance app.Application) gin.HandlerFunc {
 		secret := utils.DeriveCredential(appInstance.GetConfig().App.GlobalSecret, "frps-server", token)
 		server := &models.ServerEntity{
 			ServerID: globalID, TenantID: userInfo.GetTenantID(), UserID: userInfo.GetUserID(),
-			ServerIP: request.ServerIP, ConnectSecret: utils.HashCredential(secret),
+			ServerIP: request.ServerIP, ConnectSecret: utils.HashCredential(secret), BindPort: request.BindPort,
 		}
 		if err := server.SetConfigContent(utils.NewBaseFRPServerUserAuthConfig(request.BindPort, nil)); err != nil {
 			AbortProblem(c, http.StatusInternalServerError, "Enrollment failed", "could not create the initial FRPS configuration")
@@ -155,6 +155,10 @@ func redeemServerEnrollment(appInstance app.Application) gin.HandlerFunc {
 			}
 			if result.RowsAffected != 1 {
 				return errEnrollmentInvalid
+			}
+			if err := tx.Model(&models.Server{}).Where("server_id = ?", enrollment.ServerID).
+				Updates(map[string]any{"enrolled_at": now, "last_seen_at": nil}).Error; err != nil {
+				return err
 			}
 			response = redeemServerEnrollmentResponse{ServerID: enrollment.ServerID, Secret: secret}
 			return nil

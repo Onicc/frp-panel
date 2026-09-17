@@ -31,6 +31,10 @@ type ClientEntity struct {
 	OriginClientID string `json:"origin_client_id" gorm:"index"`
 	FrpsUrl        string `json:"frps_url" gorm:"index"`
 	Ephemeral      bool   `json:"ephemeral" gorm:"index"`
+	// Enabled is the desired lifecycle state for a physical Client. Stopped is
+	// retained for the legacy transport and is kept in sync by the v2 API.
+	Enabled    bool       `json:"enabled" gorm:"index;default:true"`
+	EnrolledAt *time.Time `json:"enrolled_at" gorm:"index"`
 
 	LastSeenAt *time.Time `json:"last_seen_at" gorm:"index"`
 	CreatedAt  time.Time

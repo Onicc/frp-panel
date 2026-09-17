@@ -27,6 +27,7 @@ services:
       APP_GLOBAL_SECRET: ${APP_GLOBAL_SECRET:?set a random 32+ character secret}
       APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-true}
       APP_ENABLE_REGISTER: ${APP_ENABLE_REGISTER:-false}
+      APP_AGENT_INSTALL_URL: ${APP_AGENT_INSTALL_URL:-https://raw.githubusercontent.com/Onicc/frp-panel/main}
       PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
     ports:
       - "127.0.0.1:9000:9000"
@@ -50,13 +51,16 @@ FRP_PANEL_IMAGE=onicc/frp-panel:edge
 APP_GLOBAL_SECRET=REPLACE_WITH_A_RANDOM_32_BYTE_OR_LONGER_SECRET
 APP_COOKIE_SECURE=true
 APP_ENABLE_REGISTER=true
+# Optional fork or internal mirror for install.sh/install.ps1.
+# APP_AGENT_INSTALL_URL=https://raw.githubusercontent.com/Onicc/frp-panel/main
 
 PUBLIC_URL=https://panel.example.com
 ```
 
 - Keep `APP_GLOBAL_SECRET` unchanged and private. It must contain at least 32 random bytes; changing or losing it invalidates existing credentials.
 - Enable registration only while creating the first Owner. Set `APP_ENABLE_REGISTER=false` immediately afterward and reapply the Compose configuration.
-- `PUBLIC_URL` is the only public address to configure. It must be a complete `http://` or `https://` URL without a path; HTTPS automatically derives the `wss://` RPC endpoint.
+- `PUBLIC_URL` is the only Master public address to configure. It must be a complete `http://` or `https://` URL without a path; HTTPS automatically derives the `wss://` RPC endpoint.
+- Set `APP_AGENT_INSTALL_URL` only for a fork or internal mirror; it must contain both `install.sh` and `install.ps1`.
 - With secure cookies enabled, terminate HTTPS at a reverse proxy that forwards Web, API, and WebSocket traffic to `127.0.0.1:9000`.
 - Pin a tested `v*` image tag in production; `edge` follows `main`.
 
@@ -74,7 +78,7 @@ Each FRPS is an independent data plane on the Linux host that receives public tr
 4. Save it on the target Server host and apply it. The first start redeems a ten-minute one-use token and stores the permanent credential in `/data/server.yaml` inside the named volume.
 5. Wait for the Server status to become online. Repeat for every additional FRPS host.
 
-Never reuse one generated file or Server data volume on multiple machines. If the token expires before the volume is initialized, create the same ID again to replace that not-yet-enrolled record.
+Never reuse one generated file or Server data volume on multiple machines. If a token expires or the generated file is lost, delete the un-enrolled Server (when it has no dependent Tunnels) and create the same ID again; use credential rotation for an enrolled Server.
 
 The generated file has this structure. Master inserts its configured `PUBLIC_URL` and the one-use token automatically, so the domain is not configured again:
 

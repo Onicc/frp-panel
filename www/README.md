@@ -1,6 +1,8 @@
 # frp-panel web
 
-The v2 console is a Vite 8 / React 19 single-page application.
+The console is a Vue 3 / Vite single-page application. The UI primitives are
+adapted from the open-source sub2api frontend (LGPL-3.0); see
+`src/components/vendor/NOTICE` for attribution.
 
 ```bash
 pnpm install --frozen-lockfile

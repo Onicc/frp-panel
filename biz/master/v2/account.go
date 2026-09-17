@@ -33,7 +33,7 @@ func getAccount(appInstance app.Application) gin.HandlerFunc {
 			AbortProblem(c, http.StatusNotFound, "Account not found", "the signed-in account no longer exists")
 			return
 		}
-		c.JSON(http.StatusOK, accountResponse{Username: user.UserName, Email: user.Email, Role: user.Role})
+		c.JSON(http.StatusOK, gin.H{"user": accountResponse{Username: user.UserName, Email: user.Email, Role: user.Role}})
 	}
 }
 
@@ -74,6 +74,7 @@ func changePassword(appInstance app.Application) gin.HandlerFunc {
 			return
 		}
 		cfg := appInstance.GetConfig()
+		c.SetSameSite(http.SameSiteStrictMode)
 		c.SetCookie(cfg.App.CookieName, "", -1, cfg.App.CookiePath, cfg.App.CookieDomain, cfg.App.CookieSecure, cfg.App.CookieHTTPOnly)
 		c.JSON(http.StatusOK, gin.H{"reauthenticate": true})
 	}

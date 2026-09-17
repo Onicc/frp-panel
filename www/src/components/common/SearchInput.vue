@@ -1,0 +1,2 @@
+<template><div class="search-input"><Icon name="search" size="sm" /><input :value="modelValue" :placeholder="placeholder" type="search" @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)" /></div></template>
+<script setup lang="ts">import Icon from '../icons/Icon.vue'; withDefaults(defineProps<{modelValue?:string;placeholder?:string}>(),{modelValue:'',placeholder:'Search'}); const emit=defineEmits<{ 'update:modelValue':[value:string] }>()</script>

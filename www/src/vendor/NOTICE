@@ -1,0 +1,4 @@
+The layout and common UI primitives in this directory are adapted from the
+sub2api frontend (https://github.com/Wei-Shaw/sub2api), licensed under the
+GNU Lesser General Public License v3.0. Adaptations are used under the same
+license. The frp-panel application code remains under the repository license.

@@ -15,7 +15,7 @@ type Server struct {
 }
 
 type ServerEntity struct {
-	ServerID      string            `json:"client_id" gorm:"uniqueIndex;not null;primaryKey"`
+	ServerID      string            `json:"server_id" gorm:"uniqueIndex;not null;primaryKey"`
 	TenantID      int               `json:"tenant_id" gorm:"not null,index"`
 	UserID        int               `json:"user_id" gorm:"not null"`
 	ServerIP      string            `json:"server_ip"`
@@ -23,6 +23,9 @@ type ServerEntity struct {
 	ConnectSecret string            `json:"-" gorm:"not null"`
 	Comment       string            `json:"comment"`
 	FrpsUrls      GormArray[string] `json:"frps_urls"`
+	EnrolledAt    *time.Time        `json:"enrolled_at" gorm:"index"`
+	LastSeenAt    *time.Time        `json:"last_seen_at" gorm:"index"`
+	BindPort      int               `json:"bind_port"`
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	DeletedAt     gorm.DeletedAt `gorm:"index"`

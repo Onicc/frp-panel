@@ -36,6 +36,7 @@ services:
       APP_GLOBAL_SECRET: ${APP_GLOBAL_SECRET:?set a random 32+ character secret}
       APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-true}
       APP_ENABLE_REGISTER: ${APP_ENABLE_REGISTER:-false}
+      APP_AGENT_INSTALL_URL: ${APP_AGENT_INSTALL_URL:-https://raw.githubusercontent.com/Onicc/frp-panel/main}
       PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
     ports:
       - "127.0.0.1:9000:9000"
@@ -59,6 +60,8 @@ FRP_PANEL_IMAGE=onicc/frp-panel:edge
 APP_GLOBAL_SECRET=REPLACE_WITH_A_RANDOM_32_BYTE_OR_LONGER_SECRET
 APP_COOKIE_SECURE=true
 APP_ENABLE_REGISTER=true
+# Optional fork or internal mirror for install.sh/install.ps1.
+# APP_AGENT_INSTALL_URL=https://raw.githubusercontent.com/Onicc/frp-panel/main
 
 PUBLIC_URL=https://panel.example.com
 ```
@@ -67,7 +70,8 @@ PUBLIC_URL=https://panel.example.com
 
 - `APP_GLOBAL_SECRET` 必须是唯一的高强度随机值，至少 32 字节；需要长期保存，丢失或变更会使现有凭据失效。
 - `APP_ENABLE_REGISTER` 只在创建首个 Owner 时设为 `true`，创建后立即改为 `false` 并重新应用 Compose 配置。
-- `PUBLIC_URL` 是唯一需要配置的公开地址，必须是无路径的完整 `http://` 或 `https://` URL。HTTPS 会自动派生 `wss://` RPC 地址。
+- `PUBLIC_URL` 是唯一需要配置的 Master 公开地址，必须是无路径的完整 `http://` 或 `https://` URL。HTTPS 会自动派生 `wss://` RPC 地址。
+- `APP_AGENT_INSTALL_URL` 仅在使用 fork 或内部镜像时设置；它必须包含 `install.sh` 与 `install.ps1`。
 - 使用 `APP_COOKIE_SECURE=true` 时，浏览器入口必须是 HTTPS；推荐让同机反向代理转发至 `127.0.0.1:9000`，并支持 WebSocket。
 - `edge` 会随 `main` 更新；生产环境应固定到已验证的 `v*` 镜像标签。
 
@@ -85,7 +89,7 @@ Master 只需开放 Web/API/RPC 入口，不应映射 `7000` 或任何业务 rem
 4. 将文件保存到目标 Server 主机并应用。Server 首次启动会兑换一次性令牌，并把长期凭据写入 Docker 数据卷 `/data/server.yaml`。
 5. 返回 Server 列表，状态变为“在线”即完成。重复以上步骤即可增加更多 FRPS。
 
-令牌有效期为 10 分钟且只能使用一次。超时或在数据卷创建前丢失部署结果时，使用相同 ID 重新创建即可替换尚未注册的记录。不要在多台机器上复用同一份生成文件或同一个数据卷。
+令牌有效期为 10 分钟且只能使用一次。令牌超时或部署结果丢失时，删除尚未注册且没有依赖 Tunnel 的 Server 后，再用相同 ID 创建；已注册 Server 应使用“轮换凭据”。不要在多台机器上复用同一份生成文件或同一个数据卷。
 
 控制台生成文件的结构如下；Master 会自动写入已配置的 `PUBLIC_URL` 和一次性令牌，用户不需要再次配置域名：
 

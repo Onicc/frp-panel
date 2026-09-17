@@ -1,0 +1,2 @@
+<template><div class="language-select"><Icon name="globe" size="sm" /><label class="sr-only" for="locale">Language</label><select id="locale" :value="locale" @change="setLocale(($event.target as HTMLSelectElement).value)"><option value="zh-CN">中文</option><option value="en">English</option></select></div></template>
+<script setup lang="ts">import Icon from '../icons/Icon.vue'; import { locale,setLocale } from '../../i18n'</script>

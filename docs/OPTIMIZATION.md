@@ -7,7 +7,7 @@
 | Packaging | Bootstrap left binaries/config beside the copied command | Temporary, checksum-verified download followed by atomic OS-native installation |
 | Platform support | Linux-only client entry point | Dedicated Agent builds for Linux, macOS, and Windows on amd64/arm64, with native service definitions |
 | User experience | Mutation dialogs remained open after successful create/update | Shared controlled-dialog behavior, inline server errors, deterministic refresh, account/password workflow, component and browser tests |
-| Frontend | Large legacy Next.js/component surface with duplicated patterns | Small Vite 8, React 19, TypeScript 6 SPA with responsive bilingual navigation, clear account actions, and reusable primitives |
+| Frontend | Large legacy component surface with duplicated patterns | Vue 3/Vite bilingual SPA using only the sub2api-derived layout/common primitives, responsive navigation, and explicit account actions |
 | Tunnel model | Users had to create a Client-to-Server route before creating a Tunnel | Every Tunnel selects its Client and Server directly; internal FRPC connections are created, shared, and garbage-collected automatically |
 | Authentication | Browser-managed bearer token and generic token signing | Secure cookie session, role-derived authorization, bootstrap-only Owner registration |
 | Enrollment | Long-lived credential in copied commands | Expiring, one-use, hashed token exchanged for a distinct hashed Agent secret |

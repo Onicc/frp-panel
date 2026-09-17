@@ -2,10 +2,12 @@ package models
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Onicc/frp-panel/defs"
 	"github.com/Onicc/frp-panel/pb"
 	v1 "github.com/fatedier/frp/pkg/config/v1"
+	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"gorm.io/gorm"
 )
@@ -19,19 +21,34 @@ type ProxyConfig struct {
 }
 
 type ProxyConfigEntity struct {
-	ServerID       string `json:"server_id" gorm:"index"`
-	ClientID       string `json:"client_id" gorm:"index"`
-	Name           string `json:"name" gorm:"index"`
-	Type           string `json:"type" gorm:"index"`
-	UserID         int    `json:"user_id" gorm:"index"`
-	TenantID       int    `json:"tenant_id" gorm:"index"`
-	OriginClientID string `json:"origin_client_id" gorm:"index"`
-	Content        []byte `json:"content"`
-	Stopped        bool   `json:"stopped" gorm:"index"`
+	PublicID        string     `json:"public_id" gorm:"type:varchar(36);uniqueIndex:idx_proxy_config_public_id"`
+	ServerID        string     `json:"server_id" gorm:"index"`
+	ClientID        string     `json:"client_id" gorm:"index"`
+	Name            string     `json:"name" gorm:"index"`
+	Type            string     `json:"type" gorm:"index"`
+	UserID          int        `json:"user_id" gorm:"index"`
+	TenantID        int        `json:"tenant_id" gorm:"index"`
+	OriginClientID  string     `json:"origin_client_id" gorm:"index"`
+	Content         []byte     `json:"content"`
+	Stopped         bool       `json:"stopped" gorm:"index"`
+	ManagedBy       string     `json:"managed_by" gorm:"index"`
+	DesiredRevision uint64     `json:"desired_revision"`
+	LastAppliedAt   *time.Time `json:"last_applied_at"`
+	LastError       string     `json:"last_error"`
 }
 
 func (*ProxyConfig) TableName() string {
 	return "proxy_config"
+}
+
+// BeforeCreate gives every persisted proxy a stable public identifier. Legacy
+// v1 writes do not know about PublicID; assigning it here also prevents the
+// unique column from treating multiple legacy rows as the same empty value.
+func (p *ProxyConfig) BeforeCreate(_ *gorm.DB) error {
+	if p.ProxyConfigEntity != nil && p.PublicID == "" {
+		p.PublicID = uuid.NewString()
+	}
+	return nil
 }
 
 func (p *ProxyConfigEntity) FillTypedProxyConfig(cfg v1.TypedProxyConfig) error {

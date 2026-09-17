@@ -9,7 +9,7 @@ An open-source FRP control plane with a secure Web console and a cross-platform 
 - Separate Master control plane, independently deployable Server (FRPS) data planes, and a lightweight `frp-panel-agent` Client Agent.
 - Linux amd64/arm64, macOS amd64/arm64, and Windows amd64/arm64 Agent builds.
 - Correct system installation paths; the bootstrap command never installs into the current directory.
-- Vite 8 / React 19 bilingual console with controlled mutation dialogs.
+- Vue 3 / Vite bilingual console, using the allow-listed layout and common primitives adapted from sub2api.
 - Secure defaults: TLS verification on; privileged features off; Argon2id passwords; role-derived permissions; same-origin WebSockets; protected Agent config.
 - Reproducible multi-architecture images: `onicc/frp-panel` and `onicc/frp-panel-agent`.
 - SHA-256 release checksums, SBOMs, build provenance, and pinned GitHub Actions.

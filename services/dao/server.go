@@ -2,6 +2,7 @@ package dao
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Onicc/frp-panel/models"
 	"github.com/Onicc/frp-panel/utils"
@@ -24,6 +25,19 @@ type ServerMutation interface {
 	CreateServer(userInfo models.UserInfo, server *models.ServerEntity) error
 	DeleteServer(userInfo models.UserInfo, serverID string) error
 	UpdateServer(userInfo models.UserInfo, server *models.ServerEntity) error
+	AdminUpdateServerLastSeen(serverID string) error
+}
+
+// AdminUpdateServerLastSeen records liveness reported by the server transport
+// without requiring a browser user context.
+func (m *serverMutation) AdminUpdateServerLastSeen(serverID string) error {
+	if serverID == "" {
+		return fmt.Errorf("invalid server id")
+	}
+	now := time.Now().UTC()
+	db := m.ctx.GetApp().GetDBManager().GetDefaultDB()
+	return db.Model(&models.Server{}).Where("server_id = ?", serverID).
+		Updates(map[string]any{"last_seen_at": now}).Error
 }
 
 type serverQuery struct{ *queryImpl }

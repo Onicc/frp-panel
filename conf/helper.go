@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/Onicc/frp-panel/defs"
@@ -66,6 +67,7 @@ func PermissionsForRole(role string) []defs.APIPermission {
 		{Method: "GET", Path: "*"},
 		{Method: "POST", Path: `^/api/v1/(user/(get|update)|platform/clientsstatus|client/(get|list)|server/(get|list)|proxy/(get_by_cid|get_by_sid|list_configs|get_config)|worker/(get|status|list|get_ingress)|wg/.*(get|list|topology))$`},
 		{Method: "POST", Path: `^/api/v2/account/password$`},
+		{Method: "POST", Path: `^/api/v2/auth/logout$`},
 	}
 	switch role {
 	case defs.UserRole_Owner, defs.UserRole_Admin:
@@ -73,7 +75,10 @@ func PermissionsForRole(role string) []defs.APIPermission {
 	case defs.UserRole_Operator:
 		permissions = append(permissions,
 			defs.APIPermission{Method: "POST", Path: `^/api/v1/(client|server|frpc|frps|proxy|wg|worker)(/.*)?$`},
+			defs.APIPermission{Method: "POST", Path: `^/api/v2/(clients|servers|tunnels)(/[^/]+/enrollment)?$`},
 			defs.APIPermission{Method: "POST", Path: `^/api/v2/(enrollments|server-enrollments|tunnels)$`},
+			defs.APIPermission{Method: "PATCH", Path: `^/api/v2/(clients|servers|tunnels)/[^/]+$`},
+			defs.APIPermission{Method: "DELETE", Path: `^/api/v2/(clients|servers|tunnels)(/[^/]+)?$`},
 			defs.APIPermission{Method: "DELETE", Path: `^/api/v2/tunnels$`},
 		)
 	}
@@ -97,6 +102,9 @@ func GetAPIURL(cfg Config) string {
 
 	if len(cfg.Client.APIUrl) != 0 {
 		return cfg.Client.APIUrl
+	}
+	if len(cfg.PublicURL) != 0 {
+		return strings.TrimRight(cfg.PublicURL, "/")
 	}
 
 	return fmt.Sprintf("%s://%s:%d", cfg.Master.APIScheme, cfg.Master.APIHost, cfg.Master.APIPort)

@@ -6,6 +6,7 @@ services:
       APP_GLOBAL_SECRET: ${APP_GLOBAL_SECRET:?set a random 32+ character secret}
       APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-true}
       APP_ENABLE_REGISTER: ${APP_ENABLE_REGISTER:-false}
+      APP_AGENT_INSTALL_URL: ${APP_AGENT_INSTALL_URL:-https://raw.githubusercontent.com/Onicc/frp-panel/main}
       PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
     ports:
       - "127.0.0.1:9000:9000"

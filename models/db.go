@@ -2,11 +2,13 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/Onicc/frp-panel/defs"
 	"github.com/Onicc/frp-panel/utils/logger"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -68,6 +70,99 @@ var migrations = []migration{
 				return nil
 			}
 			return tx.Migrator().CreateTable(&ServerEnrollment{})
+		},
+	},
+	{
+		version: 3,
+		name:    "managed_resource_lifecycle",
+		up: func(tx *gorm.DB) error {
+			// v1 creates tables from the current model definitions while this
+			// migration upgrades databases created by older releases. Migrator
+			// operations are idempotent and work across SQLite/Postgres.
+			// Add the fields individually so this remains compatible with
+			// databases that predate the fields. GORM infers the SQL type.
+			for _, item := range []struct {
+				model  any
+				column string
+			}{
+				{&Client{}, "Enabled"}, {&Client{}, "EnrolledAt"},
+				{&Server{}, "EnrolledAt"}, {&Server{}, "LastSeenAt"}, {&Server{}, "BindPort"},
+				{&ProxyConfig{}, "PublicID"}, {&ProxyConfig{}, "ManagedBy"},
+				{&ProxyConfig{}, "DesiredRevision"}, {&ProxyConfig{}, "LastAppliedAt"}, {&ProxyConfig{}, "LastError"},
+			} {
+				if !tx.Migrator().HasColumn(item.model, item.column) {
+					if err := tx.Migrator().AddColumn(item.model, item.column); err != nil {
+						return err
+					}
+				}
+			}
+			// Existing rows were created before Enabled existed; make the
+			// desired state explicit and infer enrollment from known config.
+			if err := tx.Model(&Client{}).Where("enabled = ?", false).Where("stopped = ?", false).Update("enabled", true).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&Client{}).Where("enrolled_at IS NULL AND COALESCE(length(config_content), 0) > 0").Update("enrolled_at", gorm.Expr("updated_at")).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&Server{}).Where("enrolled_at IS NULL AND COALESCE(length(config_content), 0) > 0").Update("enrolled_at", gorm.Expr("updated_at")).Error; err != nil {
+				return err
+			}
+			var proxies []ProxyConfig
+			if err := tx.Find(&proxies).Error; err != nil {
+				return err
+			}
+			for _, proxy := range proxies {
+				updates := map[string]any{}
+				if proxy.PublicID == "" {
+					updates["public_id"] = uuid.NewString()
+				}
+				if proxy.ManagedBy == "" {
+					if proxy.Type == "tcp" || proxy.Type == "udp" {
+						updates["managed_by"] = "tunnel"
+					} else {
+						updates["managed_by"] = "legacy"
+					}
+				}
+				if len(updates) > 0 {
+					if err := tx.Model(&ProxyConfig{}).Where("id = ?", proxy.ID).Updates(updates).Error; err != nil {
+						return err
+					}
+				}
+			}
+			var servers []Server
+			if err := tx.Find(&servers).Error; err != nil {
+				return err
+			}
+			for _, server := range servers {
+				if server.BindPort != 0 || len(server.ConfigContent) == 0 {
+					continue
+				}
+				var config struct {
+					BindPort int `json:"bindPort"`
+				}
+				if json.Unmarshal(server.ConfigContent, &config) == nil && config.BindPort != 0 {
+					if err := tx.Model(&Server{}).Where("server_id = ?", server.ServerID).Update("bind_port", config.BindPort).Error; err != nil {
+						return err
+					}
+				}
+			}
+			for _, item := range []struct {
+				model       any
+				field, name string
+			}{
+				{&Client{}, "EnrolledAt", "idx_clients_enrolled_at"},
+				{&Server{}, "EnrolledAt", "idx_servers_enrolled_at"},
+				{&Server{}, "LastSeenAt", "idx_servers_last_seen_at"},
+				{&ProxyConfig{}, "ManagedBy", "idx_proxy_config_managed_by"},
+				{&ProxyConfig{}, "PublicID", "idx_proxy_config_public_id"},
+			} {
+				if !tx.Migrator().HasIndex(item.model, item.name) {
+					if err := tx.Migrator().CreateIndex(item.model, item.field); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
 		},
 	},
 }

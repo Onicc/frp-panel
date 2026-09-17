@@ -1,0 +1,2 @@
+<template><button type="button" class="toggle" :class="{on:modelValue}" role="switch" :aria-checked="modelValue" @click="emit('update:modelValue', !modelValue)"><span></span><span class="sr-only">{{ label }}</span></button></template>
+<script setup lang="ts">withDefaults(defineProps<{modelValue:boolean;label?:string}>(),{label:'Toggle'}); const emit=defineEmits<{ 'update:modelValue':[value:boolean] }>()</script>

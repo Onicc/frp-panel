@@ -84,7 +84,7 @@ func createEnrollment(appInstance app.Application) gin.HandlerFunc {
 			}
 			client := &models.Client{ClientEntity: &models.ClientEntity{
 				ClientID: globalID, TenantID: userInfo.GetTenantID(), UserID: userInfo.GetUserID(),
-				ConnectSecret: utils.HashCredential(secret), IsShadow: true,
+				ConnectSecret: utils.HashCredential(secret), IsShadow: false, Enabled: true,
 			}}
 			if err := tx.Create(client).Error; err != nil {
 				return err
@@ -143,6 +143,10 @@ func redeemEnrollment(appInstance app.Application) gin.HandlerFunc {
 			}
 			if result.RowsAffected != 1 {
 				return errEnrollmentInvalid
+			}
+			if err := tx.Model(&models.Client{}).Where("client_id = ?", enrollment.ClientID).
+				Updates(map[string]any{"enrolled_at": now, "last_seen_at": nil}).Error; err != nil {
+				return err
 			}
 			response = redeemEnrollmentResponse{ClientID: enrollment.ClientID, Secret: secret}
 			return nil

@@ -11,11 +11,12 @@ import (
 )
 
 type Problem struct {
-	Type     string `json:"type"`
-	Title    string `json:"title"`
-	Status   int    `json:"status"`
-	Detail   string `json:"detail,omitempty"`
-	Instance string `json:"instance,omitempty"`
+	Type         string `json:"type"`
+	Title        string `json:"title"`
+	Status       int    `json:"status"`
+	Detail       string `json:"detail,omitempty"`
+	Instance     string `json:"instance,omitempty"`
+	Dependencies any    `json:"dependencies,omitempty"`
 }
 
 func Configure(router *gin.RouterGroup, appInstance app.Application) {
@@ -25,6 +26,8 @@ func Configure(router *gin.RouterGroup, appInstance app.Application) {
 	router.GET("/bootstrap-status", bootstrapStatus(appInstance))
 	router.POST("/agent/enroll", middleware.LoginRateLimit(), redeemEnrollment(appInstance))
 	router.POST("/server/enroll", middleware.LoginRateLimit(), redeemServerEnrollment(appInstance))
+	router.POST("/auth/login", middleware.LoginRateLimit(), login(appInstance))
+	router.POST("/auth/register", middleware.LoginRateLimit(), register(appInstance))
 	protected := router.Group("", middleware.JWTAuth(appInstance), middleware.AuthCtx(appInstance), middleware.RBAC(appInstance))
 	protected.GET("/capabilities", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -33,11 +36,30 @@ func Configure(router *gin.RouterGroup, appInstance app.Application) {
 		})
 	})
 	protected.GET("/account", getAccount(appInstance))
+	protected.GET("/account/session", getSessionAccount(appInstance))
+	protected.POST("/auth/logout", logout(appInstance))
 	protected.POST("/account/password", changePassword(appInstance))
+	protected.GET("/overview", overview(appInstance))
+	protected.GET("/clients", listClients(appInstance))
+	protected.POST("/clients", createClient(appInstance))
+	protected.GET("/clients/:id", getClient(appInstance))
+	protected.PATCH("/clients/:id", patchClient(appInstance))
+	protected.DELETE("/clients/:id", deleteClient(appInstance))
+	protected.POST("/clients/:id/enrollment", rotateClientEnrollment(appInstance))
+	protected.GET("/servers", listServers(appInstance))
+	protected.POST("/servers", createServer(appInstance))
+	protected.GET("/servers/:id", getServer(appInstance))
+	protected.PATCH("/servers/:id", patchServer(appInstance))
+	protected.DELETE("/servers/:id", deleteServer(appInstance))
+	protected.POST("/servers/:id/enrollment", rotateServerEnrollment(appInstance))
+	protected.GET("/tunnels", listTunnelsResource(appInstance))
+	protected.POST("/tunnels", createTunnelResource(appInstance))
+	protected.GET("/tunnels/:id", getTunnel(appInstance))
+	protected.PATCH("/tunnels/:id", patchTunnel(appInstance))
+	protected.DELETE("/tunnels/:id", deleteTunnelResource(appInstance))
+	// Legacy enrollment endpoints remain available for existing automation.
 	protected.POST("/enrollments", createEnrollment(appInstance))
 	protected.POST("/server-enrollments", createServerEnrollment(appInstance))
-	protected.GET("/tunnels", listTunnels(appInstance))
-	protected.POST("/tunnels", createTunnel(appInstance))
 	protected.DELETE("/tunnels", deleteTunnel(appInstance))
 }
 
@@ -47,4 +69,9 @@ func AbortProblem(c *gin.Context, status int, title, detail string) {
 		Type:  "https://github.com/Onicc/frp-panel/blob/main/docs/api-problems.md",
 		Title: title, Status: status, Detail: detail, Instance: c.Request.URL.Path,
 	})
+}
+
+func AbortProblemWithDependencies(c *gin.Context, status int, title, detail string, dependencies any) {
+	c.Header("Content-Type", "application/problem+json")
+	c.AbortWithStatusJSON(status, Problem{Type: "https://github.com/Onicc/frp-panel/blob/main/docs/api-problems.md", Title: title, Status: status, Detail: detail, Instance: c.Request.URL.Path, Dependencies: dependencies})
 }

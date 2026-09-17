@@ -18,17 +18,18 @@ import (
 type Config struct {
 	PublicURL string `env:"PUBLIC_URL" env-description:"single public http(s) URL used by Master and managed components"`
 	App       struct {
-		UseGvisorNet   bool   `env:"USE_GVISOR_NET" env-default:"false" env-description:"use gvisor netstack for TUN device"`
-		GlobalSecret   string `env:"GLOBAL_SECRET" env-description:"at least 32 random characters; used to derive signing keys"`
-		CookieAge      int    `env:"COOKIE_AGE" env-default:"86400" env-description:"cookie age in second, default is 1 day"`
-		CookieName     string `env:"COOKIE_NAME" env-default:"frp-panel-cookie" env-description:"cookie name"`
-		CookiePath     string `env:"COOKIE_PATH" env-default:"/" env-description:"cookie path"`
-		CookieDomain   string `env:"COOKIE_DOMAIN" env-default:"" env-description:"cookie domain"`
-		CookieSecure   bool   `env:"COOKIE_SECURE" env-default:"true" env-description:"cookie secure"`
-		CookieHTTPOnly bool   `env:"COOKIE_HTTP_ONLY" env-default:"true" env-description:"cookie http only"`
-		AllowedOrigins string `env:"ALLOWED_ORIGINS" env-description:"comma-separated browser origins allowed for websocket upgrades"`
-		EnableRegister bool   `env:"ENABLE_REGISTER" env-default:"false" env-description:"enable register, only allow the first admin to register"`
-		GithubProxyUrl string `env:"GITHUB_PROXY_URL" env-description:"optional explicitly trusted github proxy url"`
+		UseGvisorNet    bool   `env:"USE_GVISOR_NET" env-default:"false" env-description:"use gvisor netstack for TUN device"`
+		GlobalSecret    string `env:"GLOBAL_SECRET" env-description:"at least 32 random characters; used to derive signing keys"`
+		CookieAge       int    `env:"COOKIE_AGE" env-default:"86400" env-description:"cookie age in second, default is 1 day"`
+		CookieName      string `env:"COOKIE_NAME" env-default:"frp-panel-cookie" env-description:"cookie name"`
+		CookiePath      string `env:"COOKIE_PATH" env-default:"/" env-description:"cookie path"`
+		CookieDomain    string `env:"COOKIE_DOMAIN" env-default:"" env-description:"cookie domain"`
+		CookieSecure    bool   `env:"COOKIE_SECURE" env-default:"true" env-description:"cookie secure"`
+		CookieHTTPOnly  bool   `env:"COOKIE_HTTP_ONLY" env-default:"true" env-description:"cookie http only"`
+		AllowedOrigins  string `env:"ALLOWED_ORIGINS" env-description:"comma-separated browser origins allowed for websocket upgrades"`
+		EnableRegister  bool   `env:"ENABLE_REGISTER" env-default:"false" env-description:"enable register, only allow the first admin to register"`
+		GithubProxyUrl  string `env:"GITHUB_PROXY_URL" env-description:"optional explicitly trusted github proxy url"`
+		AgentInstallURL string `env:"AGENT_INSTALL_URL" env-default:"https://raw.githubusercontent.com/Onicc/frp-panel/main" env-description:"base URL containing install.sh and install.ps1"`
 	} `env-prefix:"APP_"`
 	Master struct {
 		APIPort   int    `env:"API_PORT" env-default:"9000" env-description:"master api port"`
@@ -137,6 +138,7 @@ func DefaultConfig() Config {
 	cfg.DB.Type = defs.DBTypeSQLite3
 	cfg.DB.DSN = "/data/data.db?_pragma=journal_mode(WAL)"
 	cfg.Client.TLSRpc = true
+	cfg.App.AgentInstallURL = "https://raw.githubusercontent.com/Onicc/frp-panel/main"
 	cfg.Client.Worker.WorkerdWorkDir = "/tmp/frp-panel/workerd"
 	cfg.Logger.DefaultLoggerLevel = "info"
 	cfg.Logger.FRPLoggerLevel = "info"
