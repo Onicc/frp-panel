@@ -48,7 +48,7 @@ jobs:
   binaries:
     needs: verify
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0 }
@@ -105,25 +105,31 @@ jobs:
         run: |
           set -euo pipefail
           release_notes="Automated build from main at $GITHUB_SHA"
+          max_attempts=2
+          cleanup_timeout=2m
+          upload_timeout=25m
 
-          for attempt in 1 2 3 4 5; do
+          for attempt in 1 2; do
             # Replacing a rolling release is not atomic. Clean up both the
             # release and an orphaned edge tag before retrying creation.
-            gh release delete edge --yes --cleanup-tag >/dev/null 2>&1 || true
-            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/edge" >/dev/null 2>&1 || true
+            timeout --foreground "$cleanup_timeout" \
+              gh release delete edge --yes --cleanup-tag >/dev/null 2>&1 || true
+            timeout --foreground "$cleanup_timeout" \
+              gh api --method DELETE "repos/Onicc/frp-panel/git/refs/tags/edge" >/dev/null 2>&1 || true
 
-            if gh release create edge --target "$GITHUB_SHA" dist/upload/* \
+            if timeout --foreground --kill-after=30s "$upload_timeout" \
+              gh release create edge --target "$GITHUB_SHA" dist/upload/* \
               --prerelease --title "edge" --notes "$release_notes"; then
               exit 0
             fi
 
-            if (( attempt < 5 )); then
-              echo "Rolling edge release publish failed; retrying in 15 seconds (attempt $(( attempt + 1 ))/5)" >&2
+            if (( attempt < max_attempts )); then
+              echo "Rolling edge release publish failed or timed out; retrying in 15 seconds (attempt $(( attempt + 1 ))/$max_attempts)" >&2
               sleep 15
             fi
           done
 
-          echo "Failed to publish rolling edge release after 5 attempts" >&2
+          echo "Failed to publish rolling edge release after $max_attempts attempts" >&2
           exit 1
 
   images:
