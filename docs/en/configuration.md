@@ -18,6 +18,6 @@ Primary environment variables. The table describes variables supported by the pr
 
 The official Master image sets the SQLite file to `/data/frp-panel.db` through its image environment. If you change `MASTER_API_PORT`, `MASTER_RPC_PORT`, or database settings, pass the variables explicitly and update Compose port mappings, the healthcheck, and the volume strategy. The repository Compose file maps only `127.0.0.1:9000` by default.
 
-An independent FRPS container accepts the same `PUBLIC_URL`, plus `SERVER_ENROLLMENT_TOKEN` and `SERVER_CONFIG_PATH` (default `/data/server.yaml`). After enrollment, the volume configuration is authoritative and the one-use token may be removed.
+An independent FRPS container accepts the same `PUBLIC_URL`, plus `SERVER_ENROLLMENT_TOKEN` and `SERVER_CONFIG_PATH` (default `/data/server.yaml`). `SERVER_API_PORT` (default `8999`) controls the loopback-only API used by the FRPS authentication plugin. It must be free on the target host and different from the FRPS bind port and every Tunnel remote port; do not expose it publicly. After enrollment, the volume configuration is authoritative and the one-use token may be removed.
 
 Never commit `.env`, database files, enrollment tokens, or Agent configuration. Production ingress should enforce HTTPS, request-size limits, and trusted-proxy rules. See the complete [deployment guide](/en/deployment).

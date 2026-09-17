@@ -86,7 +86,7 @@ Master 只需开放 Web/API/RPC 入口，不应映射 `7000` 或任何业务 rem
 每个 FRPS 都是独立数据面，部署在真正接收公网流量的 Linux 服务器上：
 
 1. 登录 Master，打开 **Servers → 创建 Server**。
-2. 填写唯一 ID、该机器供 FRPC 连接的公网域名/IP，以及 FRPS 绑定端口（默认 `7000`）。
+2. 填写唯一 ID、该机器供 FRPC 连接的公网域名/IP、FRPS 绑定端口（默认 `7000`）和 Server 本地鉴权 API 端口（`SERVER_API_PORT`，默认 `8999`）。两个端口必须不同，并且都必须在目标主机上未被其他程序占用。
 3. 创建后，弹出页会关闭，页面上方会显示该 Server 专属的完整 `compose.yaml`。
 4. 将文件保存到目标 Server 主机并应用。Server 首次启动会兑换一次性令牌，并把长期凭据写入 Docker 数据卷 `/data/server.yaml`。
 5. 返回 Server 列表，状态变为“在线”即完成。重复以上步骤即可增加更多 FRPS。
@@ -108,6 +108,7 @@ services:
     environment:
       PUBLIC_URL: "MASTER_PUBLIC_URL_INSERTED_BY_CONSOLE"
       SERVER_ENROLLMENT_TOKEN: "ONE_TIME_TOKEN_FROM_MASTER"
+      SERVER_API_PORT: "8999"
     volumes:
       - frp-panel-server-data:/data
 
@@ -121,7 +122,7 @@ volumes:
 - 每条 Tunnel 实际使用的 TCP/UDP remote port，供业务访问；
 - Server 到 Master 的 HTTPS/WSS 出站访问。
 
-由于使用 host network，`127.0.0.1:8999` 是 Server 主机的回环地址，仅供 FRPS 鉴权插件使用，不应对外开放。
+由于使用 host network，`SERVER_API_PORT`（默认 `127.0.0.1:8999`）是 Server 主机的回环地址，仅供 FRPS 鉴权插件使用，不应对外开放。它与 FRPS 绑定端口以及所有 Tunnel 远端端口一样，必须在目标主机上保持空闲；如果同一主机运行多个 FRPS，必须为每个实例设置不同的 `SERVER_API_PORT`。
 
 Server 必须使用控制台生成的文件，不要手工复制 Master 的 `.env`。首次注册成功后，重启会直接读取数据卷中的受保护凭据。
 
@@ -165,7 +166,7 @@ Client 上线后无需预先绑定 Server。打开 **Tunnels → 创建 Tunnel**
 | Master | `9001/tcp` | 原生 gRPC | 使用 WSS 时不发布 |
 | 每台 Server | `7000/tcp` 或自定义值 | FRPC 连接入口 | 对 Client 开放 |
 | 每台 Server | remote ports | Tunnel 业务入口 | 按业务逐项开放 TCP/UDP |
-| 每台 Server | `8999/tcp` | 本地鉴权 API | 仅回环地址，不开放 |
+| 每台 Server | `8999/tcp` 或 `SERVER_API_PORT` 自定义值 | 本地鉴权 API | 仅回环地址，不开放 |
 
 ## 7. 验收与备份
 

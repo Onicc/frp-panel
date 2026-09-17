@@ -1,6 +1,6 @@
 export type Account = { username:string; email:string; role:string }
 export type Client = { id:string; comment:string; configurationState:'configured'|'unconfigured'; status:'pending'|'online'|'offline'|'error'|'disabled'; enabled:boolean; lastSeenAt?:string; enrolledAt?:string; tunnelCount:number }
-export type Server = { id:string; address:string; bindPort:number; comment:string; configurationState:'configured'|'unconfigured'; status:'pending'|'online'|'offline'|'error'|'disabled'; lastSeenAt?:string; enrolledAt?:string; tunnelCount:number }
+export type Server = { id:string; address:string; bindPort:number; serverApiPort:number; comment:string; configurationState:'configured'|'unconfigured'; status:'pending'|'online'|'offline'|'error'|'disabled'; lastSeenAt?:string; enrolledAt?:string; tunnelCount:number }
 export type Tunnel = { id:string; name:string; clientId:string; serverId:string; type:'tcp'|'udp'; localHost:string; localPort:number; remotePort:number; enabled:boolean; status:string; lastError?:string; updatedAt:string }
 export type Page<T> = { items:T[]; total:number; page:number; pageSize:number }
 export type Enrollment = { clientId?:string; serverId?:string; token:string; expiresAt:string; apiUrl:string; rpcUrl:string; installCommand?:string; installCommands?:Record<'linux'|'darwin'|'windows',string>; composeYaml?:string }
@@ -27,7 +27,7 @@ export const api={
   deleteClient:(id:string)=>request<void>(`/api/v2/clients/${encodeURIComponent(id)}`,{method:'DELETE'}),
   rotateClient:(id:string,acknowledgeDisruption:boolean)=>request<{client:Client;enrollment:Enrollment}>(`/api/v2/clients/${encodeURIComponent(id)}/enrollment`,{method:'POST',body:JSON.stringify({acknowledgeDisruption})}),
   servers:(params:Record<string,string|number|undefined>={})=>request<Page<Server>>(`/api/v2/servers${query(params)}`),
-  createServer:(body:{serverId:string;address:string;bindPort:number;comment?:string})=>request<{server:Server;enrollment:Enrollment}>('/api/v2/servers',{method:'POST',body:JSON.stringify(body)}),
+  createServer:(body:{serverId:string;address:string;bindPort:number;serverApiPort:number;comment?:string})=>request<{server:Server;enrollment:Enrollment}>('/api/v2/servers',{method:'POST',body:JSON.stringify(body)}),
   updateServer:(id:string,body:Record<string,unknown>)=>request<{server:Server}>(`/api/v2/servers/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(body)}),
   deleteServer:(id:string)=>request<void>(`/api/v2/servers/${encodeURIComponent(id)}`,{method:'DELETE'}),
   rotateServer:(id:string,acknowledgeDisruption:boolean)=>request<{server:Server;enrollment:Enrollment}>(`/api/v2/servers/${encodeURIComponent(id)}/enrollment`,{method:'POST',body:JSON.stringify({acknowledgeDisruption})}),

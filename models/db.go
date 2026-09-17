@@ -165,6 +165,18 @@ var migrations = []migration{
 			return nil
 		},
 	},
+	{
+		version: 4,
+		name:    "server_api_port",
+		up: func(tx *gorm.DB) error {
+			if !tx.Migrator().HasColumn(&Server{}, "ServerAPIPort") {
+				if err := tx.Migrator().AddColumn(&Server{}, "ServerAPIPort"); err != nil {
+					return err
+				}
+			}
+			return tx.Model(&Server{}).Where("server_api_port = 0").Update("server_api_port", defs.DefaultServerAPIPort).Error
+		},
+	},
 }
 
 func runMigrations(db *gorm.DB) error {

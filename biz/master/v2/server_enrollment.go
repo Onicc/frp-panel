@@ -18,9 +18,10 @@ import (
 )
 
 type createServerEnrollmentRequest struct {
-	ServerID string `json:"serverId" binding:"required"`
-	ServerIP string `json:"serverIp" binding:"required"`
-	BindPort int    `json:"bindPort"`
+	ServerID      string `json:"serverId" binding:"required"`
+	ServerIP      string `json:"serverIp" binding:"required"`
+	BindPort      int    `json:"bindPort"`
+	ServerAPIPort int    `json:"serverApiPort"`
 }
 
 type createServerEnrollmentResponse struct {
@@ -51,11 +52,10 @@ func createServerEnrollment(appInstance app.Application) gin.HandlerFunc {
 			AbortProblem(c, http.StatusBadRequest, "Invalid server address", "use a public IP address or DNS hostname without a scheme or port")
 			return
 		}
-		if request.BindPort == 0 {
-			request.BindPort = 7000
-		}
-		if request.BindPort < 1024 || request.BindPort > 65535 {
-			AbortProblem(c, http.StatusBadRequest, "Invalid bind port", "bindPort must be between 1024 and 65535")
+		var portErr error
+		request.BindPort, request.ServerAPIPort, portErr = normalizeServerPorts(request.BindPort, request.ServerAPIPort)
+		if portErr != nil {
+			AbortProblem(c, http.StatusBadRequest, "Invalid Server ports", portErr.Error())
 			return
 		}
 
@@ -74,7 +74,7 @@ func createServerEnrollment(appInstance app.Application) gin.HandlerFunc {
 		secret := utils.DeriveCredential(appInstance.GetConfig().App.GlobalSecret, "frps-server", token)
 		server := &models.ServerEntity{
 			ServerID: globalID, TenantID: userInfo.GetTenantID(), UserID: userInfo.GetUserID(),
-			ServerIP: request.ServerIP, ConnectSecret: utils.HashCredential(secret), BindPort: request.BindPort,
+			ServerIP: request.ServerIP, ConnectSecret: utils.HashCredential(secret), BindPort: request.BindPort, ServerAPIPort: request.ServerAPIPort,
 		}
 		if err := server.SetConfigContent(utils.NewBaseFRPServerUserAuthConfig(request.BindPort, nil)); err != nil {
 			AbortProblem(c, http.StatusInternalServerError, "Enrollment failed", "could not create the initial FRPS configuration")

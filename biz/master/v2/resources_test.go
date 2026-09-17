@@ -91,6 +91,10 @@ func TestTunnelUpdateChangesServerAndProtectsRemotePort(t *testing.T) {
 	if conflict.Code != http.StatusConflict || !strings.Contains(conflict.Body.String(), "Remote port already in use") {
 		t.Fatalf("remote port conflict = %d %s", conflict.Code, conflict.Body.String())
 	}
+	reserved := request(http.MethodPost, "/tunnels", `{"name":"ssh-reserved","clientId":"mac","serverId":"edge-a","type":"tcp","localPort":25,"remotePort":8999}`)
+	if reserved.Code != http.StatusConflict || !strings.Contains(reserved.Body.String(), "SERVER_API_PORT") {
+		t.Fatalf("reserved server API port = %d %s", reserved.Code, reserved.Body.String())
+	}
 	movable := request(http.MethodPost, "/tunnels", `{"name":"ssh-c","clientId":"mac","serverId":"edge-a","type":"tcp","localPort":24,"remotePort":6023}`)
 	if movable.Code != http.StatusCreated {
 		t.Fatalf("create movable tunnel = %d %s", movable.Code, movable.Body.String())
@@ -117,6 +121,38 @@ func TestTunnelUpdateChangesServerAndProtectsRemotePort(t *testing.T) {
 	}
 	if stored.ServerID != "owner.s.edge-b" {
 		t.Fatalf("stored tunnel server = %q", stored.ServerID)
+	}
+}
+
+func TestServerAPIPortIsConfigurableAndCannotMatchBindPort(t *testing.T) {
+	a, user := resourceTestApp(t)
+	r := resourceRouter(a, user)
+	post := func(body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/servers", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(rec, req)
+		return rec
+	}
+
+	conflict := post(`{"serverId":"same-port","address":"edge.example.test","bindPort":7001,"serverApiPort":7001}`)
+	if conflict.Code != http.StatusBadRequest || !strings.Contains(conflict.Body.String(), "bindPort and SERVER_API_PORT must be different") {
+		t.Fatalf("same port status = %d %s", conflict.Code, conflict.Body.String())
+	}
+
+	created := post(`{"serverId":"custom-api","address":"edge.example.test","bindPort":7001,"serverApiPort":8998}`)
+	if created.Code != http.StatusCreated {
+		t.Fatalf("custom API port status = %d %s", created.Code, created.Body.String())
+	}
+	var payload struct {
+		Server     serverResource    `json:"server"`
+		Enrollment enrollmentPayload `json:"enrollment"`
+	}
+	if err := json.Unmarshal(created.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Server.ServerAPIPort != 8998 || strings.Contains(payload.Enrollment.ComposeYAML, "\t") || !strings.Contains(payload.Enrollment.ComposeYAML, "SERVER_API_PORT: \"8998\"") {
+		t.Fatalf("server API port was not propagated: %#v", payload)
 	}
 }
 
@@ -210,7 +246,7 @@ func TestEnrollmentIncludesSafeCrossPlatformInstallCommands(t *testing.T) {
 	cfg.Client.RPCUrl = "wss://panel.example.test"
 	cfg.App.AgentInstallURL = "https://raw.example.test/frp-panel"
 	a.SetConfig(cfg)
-	payload := makeEnrollment(a, "owner.c.mac", "client", "token-without-shell-breakout", time.Now().UTC().Add(time.Minute))
+	payload := makeEnrollment(a, "owner.c.mac", "client", 0, "token-without-shell-breakout", time.Now().UTC().Add(time.Minute))
 	if payload.InstallCommand == "" || payload.InstallCommands["linux"] != payload.InstallCommand {
 		t.Fatalf("linux compatibility command missing: %#v", payload)
 	}

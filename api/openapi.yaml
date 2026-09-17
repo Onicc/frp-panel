@@ -607,6 +607,7 @@ components:
         serverId: { type: string, pattern: '^[A-Za-z0-9_-]+$' }
         address: { type: string, description: Public DNS name or IP without scheme or port. }
         bindPort: { type: integer, minimum: 1024, maximum: 65535, default: 7000 }
+        serverApiPort: { type: integer, minimum: 1024, maximum: 65535, default: 8999, description: Loopback-only Server Agent authentication API port. Must differ from bindPort. }
         comment: { type: string, maxLength: 255 }
     ServerPatch:
       type: object
@@ -614,14 +615,16 @@ components:
       properties:
         address: { type: string }
         bindPort: { type: integer, minimum: 1024, maximum: 65535 }
+        serverApiPort: { type: integer, minimum: 1024, maximum: 65535, description: Loopback-only Server Agent authentication API port. Must differ from bindPort. }
         comment: { type: string, maxLength: 255 }
     Server:
       type: object
-      required: [id, address, bindPort, comment, configurationState, status, tunnelCount]
+      required: [id, address, bindPort, serverApiPort, comment, configurationState, status, tunnelCount]
       properties:
         id: { type: string }
         address: { type: string }
         bindPort: { type: integer }
+        serverApiPort: { type: integer }
         comment: { type: string }
         configurationState: { type: string, enum: [configured, unconfigured] }
         status: { $ref: '#/components/schemas/ServerStatus' }

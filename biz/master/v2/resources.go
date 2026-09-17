@@ -16,6 +16,7 @@ import (
 
 	"github.com/Onicc/frp-panel/common"
 	"github.com/Onicc/frp-panel/conf"
+	"github.com/Onicc/frp-panel/defs"
 	"github.com/Onicc/frp-panel/models"
 	"github.com/Onicc/frp-panel/pb"
 	"github.com/Onicc/frp-panel/services/app"
@@ -51,6 +52,7 @@ type serverResource struct {
 	ID                 string     `json:"id"`
 	Address            string     `json:"address"`
 	BindPort           int        `json:"bindPort"`
+	ServerAPIPort      int        `json:"serverApiPort"`
 	Comment            string     `json:"comment"`
 	ConfigurationState string     `json:"configurationState"`
 	Status             string     `json:"status"`
@@ -97,17 +99,19 @@ type clientPatchRequest struct {
 	Enabled  *bool   `json:"enabled"`
 }
 type serverCreateRequest struct {
-	ServerID string `json:"serverId"`
-	Address  string `json:"address"`
-	BindPort int    `json:"bindPort"`
-	Comment  string `json:"comment"`
+	ServerID      string `json:"serverId"`
+	Address       string `json:"address"`
+	BindPort      int    `json:"bindPort"`
+	ServerAPIPort int    `json:"serverApiPort"`
+	Comment       string `json:"comment"`
 }
 type serverPatchRequest struct {
-	ServerID *string `json:"serverId"`
-	ID       *string `json:"id"`
-	Address  *string `json:"address"`
-	BindPort *int    `json:"bindPort"`
-	Comment  *string `json:"comment"`
+	ServerID      *string `json:"serverId"`
+	ID            *string `json:"id"`
+	Address       *string `json:"address"`
+	BindPort      *int    `json:"bindPort"`
+	ServerAPIPort *int    `json:"serverApiPort"`
+	Comment       *string `json:"comment"`
 }
 type rotateEnrollmentRequest struct {
 	AcknowledgeDisruption bool `json:"acknowledgeDisruption"`
@@ -246,7 +250,30 @@ func clientToResource(appInstance app.Application, db *gorm.DB, item *models.Cli
 func serverToResource(appInstance app.Application, db *gorm.DB, item *models.Server) serverResource {
 	var count int64
 	db.Model(&models.ProxyConfig{}).Where("tenant_id = ? AND user_id = ? AND managed_by = ? AND server_id = ?", item.TenantID, item.UserID, "tunnel", item.ServerID).Count(&count)
-	return serverResource{ID: item.ServerID, Address: item.ServerIP, BindPort: item.BindPort, Comment: item.Comment, ConfigurationState: map[bool]string{true: "configured", false: "unconfigured"}[isConfigured(item.EnrolledAt, item.ConfigContent)], Status: serverStatus(appInstance, item.ServerEntity), LastSeenAt: item.LastSeenAt, EnrolledAt: item.EnrolledAt, TunnelCount: count}
+	serverAPIPort := item.ServerAPIPort
+	if serverAPIPort == 0 {
+		serverAPIPort = defs.DefaultServerAPIPort
+	}
+	return serverResource{ID: item.ServerID, Address: item.ServerIP, BindPort: item.BindPort, ServerAPIPort: serverAPIPort, Comment: item.Comment, ConfigurationState: map[bool]string{true: "configured", false: "unconfigured"}[isConfigured(item.EnrolledAt, item.ConfigContent)], Status: serverStatus(appInstance, item.ServerEntity), LastSeenAt: item.LastSeenAt, EnrolledAt: item.EnrolledAt, TunnelCount: count}
+}
+
+func normalizeServerPorts(bindPort, serverAPIPort int) (int, int, error) {
+	if bindPort == 0 {
+		bindPort = defs.DefaultFRPSBindPort
+	}
+	if serverAPIPort == 0 {
+		serverAPIPort = defs.DefaultServerAPIPort
+	}
+	if bindPort < 1024 || bindPort > 65535 {
+		return 0, 0, fmt.Errorf("bindPort must be between 1024 and 65535")
+	}
+	if serverAPIPort < 1024 || serverAPIPort > 65535 {
+		return 0, 0, fmt.Errorf("SERVER_API_PORT must be between 1024 and 65535")
+	}
+	if bindPort == serverAPIPort {
+		return 0, 0, fmt.Errorf("bindPort and SERVER_API_PORT must be different")
+	}
+	return bindPort, serverAPIPort, nil
 }
 
 func createClient(appInstance app.Application) gin.HandlerFunc {
@@ -292,7 +319,7 @@ func createClient(appInstance app.Application) gin.HandlerFunc {
 			return
 		}
 		c.Header("Cache-Control", "no-store")
-		c.JSON(201, gin.H{"client": clientToResource(appInstance, db, &client), "enrollment": makeEnrollment(appInstance, id, "client", token, expires)})
+		c.JSON(201, gin.H{"client": clientToResource(appInstance, db, &client), "enrollment": makeEnrollment(appInstance, id, "client", 0, token, expires)})
 	}
 }
 
@@ -508,7 +535,7 @@ func rotateClientEnrollment(appInstance app.Application) gin.HandlerFunc {
 		}
 		db.Where("client_id = ?", id).First(&item)
 		c.Header("Cache-Control", "no-store")
-		c.JSON(200, gin.H{"client": clientToResource(appInstance, db, &item), "enrollment": makeEnrollment(appInstance, id, "client", token, expires)})
+		c.JSON(200, gin.H{"client": clientToResource(appInstance, db, &item), "enrollment": makeEnrollment(appInstance, id, "client", 0, token, expires)})
 	}
 }
 
@@ -530,11 +557,10 @@ func createServer(appInstance app.Application) gin.HandlerFunc {
 			AbortProblem(c, 400, "Invalid Server", "use a valid Server ID and address")
 			return
 		}
-		if req.BindPort == 0 {
-			req.BindPort = 7000
-		}
-		if req.BindPort < 1024 || req.BindPort > 65535 {
-			AbortProblem(c, 400, "Invalid bind port", "bindPort must be between 1024 and 65535")
+		var portErr error
+		req.BindPort, req.ServerAPIPort, portErr = normalizeServerPorts(req.BindPort, req.ServerAPIPort)
+		if portErr != nil {
+			AbortProblem(c, 400, "Invalid Server ports", portErr.Error())
 			return
 		}
 		id := scopedID(user.GetUserName(), "s", req.ServerID)
@@ -545,7 +571,7 @@ func createServer(appInstance app.Application) gin.HandlerFunc {
 		}
 		expires := time.Now().UTC().Add(enrollmentLifetime)
 		secret := utils.DeriveCredential(appInstance.GetConfig().App.GlobalSecret, "frps-server", token)
-		item := models.Server{ServerEntity: &models.ServerEntity{ServerID: id, TenantID: user.GetTenantID(), UserID: user.GetUserID(), ServerIP: req.Address, BindPort: req.BindPort, Comment: strings.TrimSpace(req.Comment), ConnectSecret: utils.HashCredential(secret)}}
+		item := models.Server{ServerEntity: &models.ServerEntity{ServerID: id, TenantID: user.GetTenantID(), UserID: user.GetUserID(), ServerIP: req.Address, BindPort: req.BindPort, ServerAPIPort: req.ServerAPIPort, Comment: strings.TrimSpace(req.Comment), ConnectSecret: utils.HashCredential(secret)}}
 		if err := item.SetConfigContent(utils.NewBaseFRPServerUserAuthConfig(req.BindPort, nil)); err != nil {
 			AbortProblem(c, 500, "Server creation failed", "could not create FRPS configuration")
 			return
@@ -571,7 +597,7 @@ func createServer(appInstance app.Application) gin.HandlerFunc {
 			return
 		}
 		c.Header("Cache-Control", "no-store")
-		c.JSON(201, gin.H{"server": serverToResource(appInstance, db, &item), "enrollment": makeEnrollment(appInstance, id, "server", token, expires)})
+		c.JSON(201, gin.H{"server": serverToResource(appInstance, db, &item), "enrollment": makeEnrollment(appInstance, id, "server", req.ServerAPIPort, token, expires)})
 	}
 }
 
@@ -681,6 +707,14 @@ func patchServer(appInstance app.Application) gin.HandlerFunc {
 			updates["comment"] = strings.TrimSpace(*req.Comment)
 		}
 		addressChanged := false
+		bindPort := item.BindPort
+		serverAPIPort := item.ServerAPIPort
+		if bindPort == 0 {
+			bindPort = defs.DefaultFRPSBindPort
+		}
+		if serverAPIPort == 0 {
+			serverAPIPort = defs.DefaultServerAPIPort
+		}
 		if req.Address != nil {
 			address := strings.TrimSpace(*req.Address)
 			if !validServerHost(address) {
@@ -692,13 +726,29 @@ func patchServer(appInstance app.Application) gin.HandlerFunc {
 			addressChanged = true
 		}
 		if req.BindPort != nil {
-			if *req.BindPort < 1024 || *req.BindPort > 65535 {
-				AbortProblem(c, 400, "Invalid bind port", "bindPort must be between 1024 and 65535")
-				return
-			}
-			updates["bind_port"] = *req.BindPort
-			item.BindPort = *req.BindPort
+			bindPort = *req.BindPort
+			updates["bind_port"] = bindPort
+			item.BindPort = bindPort
 			addressChanged = true
+		}
+		if req.ServerAPIPort != nil {
+			serverAPIPort = *req.ServerAPIPort
+			updates["server_api_port"] = serverAPIPort
+			item.ServerAPIPort = serverAPIPort
+		}
+		var portErr error
+		bindPort, serverAPIPort, portErr = normalizeServerPorts(bindPort, serverAPIPort)
+		if portErr != nil {
+			AbortProblem(c, 400, "Invalid Server ports", portErr.Error())
+			return
+		}
+		if req.BindPort != nil {
+			updates["bind_port"] = bindPort
+			item.BindPort = bindPort
+		}
+		if req.ServerAPIPort != nil {
+			updates["server_api_port"] = serverAPIPort
+			item.ServerAPIPort = serverAPIPort
 		}
 		if addressChanged {
 			cfg, configErr := item.GetConfigContent()
@@ -714,7 +764,7 @@ func patchServer(appInstance app.Application) gin.HandlerFunc {
 			updates["config_content"] = raw
 		}
 		if len(updates) == 0 {
-			AbortProblem(c, 400, "No changes", "provide address, bindPort, or comment")
+			AbortProblem(c, 400, "No changes", "provide address, bindPort, serverApiPort, or comment")
 			return
 		}
 		if db.Model(&models.Server{}).Where("server_id = ? AND user_id = ? AND tenant_id = ?", id, user.GetUserID(), user.GetTenantID()).Updates(updates).Error != nil {
@@ -827,7 +877,7 @@ func rotateServerEnrollment(appInstance app.Application) gin.HandlerFunc {
 		}
 		db.Where("server_id = ?", id).First(&item)
 		c.Header("Cache-Control", "no-store")
-		c.JSON(200, gin.H{"server": serverToResource(appInstance, db, &item), "enrollment": makeEnrollment(appInstance, id, "server", token, expires)})
+		c.JSON(200, gin.H{"server": serverToResource(appInstance, db, &item), "enrollment": makeEnrollment(appInstance, id, "server", item.ServerAPIPort, token, expires)})
 	}
 }
 
@@ -867,6 +917,26 @@ func tunnelContent(req tunnelRequest) ([]byte, error) {
 // with another active listener on the same Server. TCP and UDP may share a
 // numeric port, but two listeners of the same protocol cannot.
 func ensureTunnelRemotePortAvailable(db *gorm.DB, user models.UserInfo, req tunnelRequest, excludePublicID string) error {
+	if req.Enabled != nil && *req.Enabled {
+		var server models.Server
+		if err := db.Where("server_id = ? AND user_id = ? AND tenant_id = ?", req.ServerID, user.GetUserID(), user.GetTenantID()).First(&server).Error; err != nil {
+			return fmt.Errorf("check remote port availability: %w", err)
+		}
+		bindPort := server.BindPort
+		if bindPort == 0 {
+			bindPort = defs.DefaultFRPSBindPort
+		}
+		serverAPIPort := server.ServerAPIPort
+		if serverAPIPort == 0 {
+			serverAPIPort = defs.DefaultServerAPIPort
+		}
+		if req.RemotePort == bindPort {
+			return fmt.Errorf("remote port %d is reserved by the Server Bind port", req.RemotePort)
+		}
+		if req.RemotePort == serverAPIPort {
+			return fmt.Errorf("remote port %d is reserved by SERVER_API_PORT", req.RemotePort)
+		}
+	}
 	var rows []models.ProxyConfig
 	q := db.Where("user_id = ? AND tenant_id = ? AND managed_by = ? AND server_id = ? AND stopped = ?", user.GetUserID(), user.GetTenantID(), "tunnel", req.ServerID, false)
 	if excludePublicID != "" {
@@ -1156,7 +1226,7 @@ func tunnelToResource(appInstance app.Application, item *models.ProxyConfig) tun
 	return tunnelResource{ID: item.PublicID, Name: item.Name, ClientID: item.OriginClientID, ServerID: item.ServerID, Type: item.Type, LocalHost: r.LocalHost, LocalPort: r.LocalPort, RemotePort: r.RemotePort, Enabled: !item.Stopped, Status: tunnelStatus(appInstance, item), LastError: item.LastError, UpdatedAt: item.UpdatedAt}
 }
 
-func makeEnrollment(appInstance app.Application, id, kind, token string, expires time.Time) enrollmentPayload {
+func makeEnrollment(appInstance app.Application, id, kind string, serverAPIPort int, token string, expires time.Time) enrollmentPayload {
 	cfg := appInstance.GetConfig()
 	apiURL := conf.GetAPIURL(cfg)
 	rpcURL := cfg.Client.RPCUrl
@@ -1180,6 +1250,9 @@ func makeEnrollment(appInstance app.Application, id, kind, token string, expires
 		p.InstallCommand = p.InstallCommands["linux"]
 	} else {
 		p.ServerID = id
+		if serverAPIPort == 0 {
+			serverAPIPort = defs.DefaultServerAPIPort
+		}
 		p.ComposeYAML = fmt.Sprintf(`services:
   frps:
     image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:edge}
@@ -1189,12 +1262,13 @@ func makeEnrollment(appInstance app.Application, id, kind, token string, expires
     environment:
       PUBLIC_URL: %q
       SERVER_ENROLLMENT_TOKEN: %q
+      SERVER_API_PORT: %q
     volumes:
       - frp-panel-server-data:/data
 
 volumes:
   frp-panel-server-data:
-`, apiURL, token)
+`, apiURL, token, strconv.Itoa(serverAPIPort))
 	}
 	return p
 }

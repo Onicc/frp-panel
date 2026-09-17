@@ -20,4 +20,6 @@
 
 独立 FRPS 容器接受相同的 `PUBLIC_URL`，以及 `SERVER_ENROLLMENT_TOKEN`、`SERVER_CONFIG_PATH`（默认 `/data/server.yaml`）。注册成功后以数据卷中的配置为准，一次性令牌可以移除。
 
+Server Compose 还可以设置 `SERVER_API_PORT`（默认 `8999`），用于 FRPS 鉴权插件访问的本机回环 API。它必须与 Server 的 FRPS 绑定端口和所有 Tunnel 远端端口不同，并在目标主机上保持空闲；该端口不应暴露到公网。
+
 不要把 `.env`、数据库文件、注册令牌或 Agent 配置提交到版本库。生产入口应设置 HTTPS、请求大小限制和可信代理规则。完整示例见 [部署指南](/deployment)。

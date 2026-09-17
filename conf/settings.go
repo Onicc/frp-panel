@@ -134,7 +134,7 @@ func DefaultConfig() Config {
 	cfg.Master.CacheSize = 10
 	cfg.Master.RPCHost = "127.0.0.1"
 	cfg.Master.RPCPort = 9001
-	cfg.Server.APIPort = 8999
+	cfg.Server.APIPort = defs.DefaultServerAPIPort
 	cfg.DB.Type = defs.DBTypeSQLite3
 	cfg.DB.DSN = "/data/data.db?_pragma=journal_mode(WAL)"
 	cfg.Client.TLSRpc = true

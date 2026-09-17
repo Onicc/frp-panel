@@ -41,6 +41,7 @@
             <th>{{ t('servers.id') }}</th>
             <th>{{ t('servers.address') }}</th>
             <th class="num">{{ t('servers.bindPort') }}</th>
+            <th class="num">{{ t('servers.serverApiPort') }}</th>
             <th>{{ t('servers.state') }}</th>
             <th>{{ t('servers.status') }}</th>
             <th class="num">{{ t('servers.tunnels') }}</th>
@@ -57,6 +58,7 @@
             </td>
             <td>{{ item.address }}</td>
             <td class="num mono">{{ item.bindPort }}</td>
+            <td class="num mono">{{ item.serverApiPort }}</td>
             <td><StatusBadge :status="item.configurationState" /></td>
             <td><StatusBadge :status="item.status" /></td>
             <td class="num">{{ item.tunnelCount }}</td>
@@ -85,7 +87,19 @@
       <form @submit.prevent="saveServer">
         <Input v-model="form.serverId" :label="t('servers.id')" :disabled="dialog === 'edit'" required />
         <Input v-model="form.address" :label="t('servers.address')" required />
-        <Input v-model.number="form.bindPort" :label="t('servers.bindPort')" type="number" min="1024" max="65535" required />
+        <div class="form-grid">
+          <Input v-model.number="form.bindPort" :label="t('servers.bindPort')" type="number" min="1024" max="65535" required />
+          <Input
+            v-model.number="form.serverApiPort"
+            :label="t('servers.serverApiPort')"
+            :hint="t('servers.portHint')"
+            :error="portConflict ? t('servers.portConflict') : undefined"
+            type="number"
+            min="1024"
+            max="65535"
+            required
+          />
+        </div>
         <Input v-model="form.comment" :label="t('servers.comment')" />
         <p v-if="modalError" class="error" role="alert">{{ modalError }}</p>
       </form>
@@ -165,7 +179,9 @@ const statusOptions = computed(() => [
   { value: '', label: t('servers.allStatus') },
   ...statuses.map((value) => ({ value, label: t(`common.${value}`) })),
 ])
-const form = reactive({ serverId: '', address: '', bindPort: 7000, comment: '', acknowledge: false })
+const form = reactive({ serverId: '', address: '', bindPort: 7000, serverApiPort: 8999, comment: '', acknowledge: false })
+
+const portConflict = computed(() => Number(form.bindPort) > 0 && Number(form.bindPort) === Number(form.serverApiPort))
 
 const deleteMessage = computed(() =>
   selected.value ? `${t('servers.deleteHint')} ${selected.value.id}` : t('servers.deleteHint')
@@ -183,24 +199,25 @@ const loadData = async () => {
 const { loading, refreshing, refresh: load } = useAutoRefresh(loadData)
 watch([search, stateFilter, statusFilter], () => { page.value = 1; void load() })
 
-const reset = () => { form.serverId = ''; form.address = ''; form.bindPort = 7000; form.comment = ''; form.acknowledge = false; modalError.value = '' }
+const reset = () => { form.serverId = ''; form.address = ''; form.bindPort = 7000; form.serverApiPort = 8999; form.comment = ''; form.acknowledge = false; modalError.value = '' }
 const closeDialog = () => { dialog.value = ''; reset() }
 const openCreate  = () => { reset(); dialog.value = 'create' }
-const openEdit    = (item: Server) => { reset(); selected.value = item; form.serverId = item.id; form.address = item.address; form.bindPort = item.bindPort; form.comment = item.comment; dialog.value = 'edit' }
+const openEdit    = (item: Server) => { reset(); selected.value = item; form.serverId = item.id; form.address = item.address; form.bindPort = item.bindPort; form.serverApiPort = item.serverApiPort || 8999; form.comment = item.comment; dialog.value = 'edit' }
 const openRotate  = (item: Server) => { reset(); selected.value = item; dialog.value = 'rotate' }
 const openDelete  = (item: Server) => { selected.value = item; dialog.value = 'delete' }
 
 const saveServer = async () => {
   modalError.value = ''
   if (!form.serverId || !form.address) { modalError.value = t('problems.required'); return }
+  if (portConflict.value) { modalError.value = t('servers.portConflict'); return }
   busy.value = true
   try {
     if (dialog.value === 'create') {
-      const result = await api.createServer({ serverId: form.serverId, address: form.address, bindPort: form.bindPort, comment: form.comment })
+      const result = await api.createServer({ serverId: form.serverId, address: form.address, bindPort: form.bindPort, serverApiPort: form.serverApiPort, comment: form.comment })
       latestCompose.value = result.enrollment.composeYaml || ''
       toast.show(t('common.success'))
     } else if (selected.value) {
-      await api.updateServer(selected.value.id, { address: form.address, bindPort: form.bindPort, comment: form.comment })
+      await api.updateServer(selected.value.id, { address: form.address, bindPort: form.bindPort, serverApiPort: form.serverApiPort, comment: form.comment })
       toast.show(t('common.success'))
     }
     closeDialog()
