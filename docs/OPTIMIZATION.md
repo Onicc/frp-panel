@@ -8,7 +8,7 @@
 | Platform support | Linux-only client entry point | Dedicated Agent builds for Linux, macOS, and Windows on amd64/arm64, with native service definitions |
 | User experience | Mutation dialogs remained open after successful create/update | Shared controlled-dialog behavior, inline server errors, deterministic refresh, account/password workflow, component and browser tests |
 | Frontend | Large legacy component surface with duplicated patterns | Vue 3/Vite bilingual SPA using only the sub2api-derived layout/common primitives, responsive navigation, and explicit account actions |
-| Tunnel model | Users had to create a Client-to-Server route before creating a Tunnel | Every Tunnel selects its Client and Server directly; internal FRPC connections are created, shared, and garbage-collected automatically |
+| Tunnel model | Users had to create a Client-to-Server route before creating a Tunnel | Every Tunnel selects its Client and Server directly; Master persists desired Tunnel state and best-effort creates/shares FRPC connections when the Client is online and both resources are enrolled. Cleanup is conservative because the current removal event targets a physical Client, and reconnect reconciliation is not automatic yet |
 | Authentication | Browser-managed bearer token and generic token signing | Secure cookie session, role-derived authorization, bootstrap-only Owner registration |
 | Enrollment | Long-lived credential in copied commands | Expiring, one-use, hashed token exchanged for a distinct hashed Agent secret |
 | Persistence | Implicit schema mutation at startup | Ordered, transactional, idempotent SQLite/PostgreSQL migration registry |

@@ -16,7 +16,7 @@ An open-source FRP control plane with a secure Web console and a cross-platform 
 
 ## Deploy Master, Server, and Client
 
-Deploy exactly one Master with the repository Compose file. Master owns the Web console and desired state but carries no proxy traffic. Create any number of Servers in **Servers**; each creation returns a one-time Docker Compose deployment for an independent FRPS host. Create Clients in **Clients** and install the Client Agent with the generated Linux, macOS, or Windows command. Select a Client and Server directly on every Tunnel; one Client can own multiple Tunnels that use different Servers, while Master creates, shares, and removes the underlying FRPC connections automatically.
+Deploy exactly one Master with the repository Compose file. Master owns the Web console and desired state but carries no proxy traffic. Create any number of Servers in **Servers**; each creation returns a one-time Docker Compose deployment for an independent FRPS host. Create Clients in **Clients** and install the Client Agent with the generated Linux, macOS, or Windows command. Select a Client and Server directly on every Tunnel; one Client can own multiple Tunnels that use different Servers, while Master creates and shares the underlying FRPC connections on a best-effort basis when the Client is online and both resources are enrolled. Cleanup is limited by the current Client-level removal protocol.
 
 Both Server and Client bootstrap tokens expire after ten minutes and can be redeemed only once. Persistent credentials are hashed in Master and stored only in protected files or volumes on the managed host.
 
@@ -32,7 +32,7 @@ The console-generated command installs the Agent to:
 | macOS | `/usr/local/libexec/frp-panel/frp-panel-agent` | `/Library/Application Support/frp-panel` |
 | Windows | `%ProgramFiles%\frp-panel\frp-panel-agent.exe` | `%ProgramData%\frp-panel` |
 
-The service is named `frp-panel-agent`. The binary is not automatically added to `PATH`; use the full path above or the native service manager.
+The Linux and Windows service name is `frp-panel-agent`; the macOS launchd label is `io.github.onicc.frp-panel.agent`. The binary is not automatically added to `PATH`; use the full path above or the native service manager.
 
 ## Development
 

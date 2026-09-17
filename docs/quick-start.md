@@ -4,7 +4,7 @@ frp-panel 采用 **一个 Master、多个独立 FRPS Server、多个 FRPC Client
 
 ## 1. Master
 
-使用仓库 `compose.yaml` 部署唯一的 Master，并按 `.env.sample` 设置 `APP_GLOBAL_SECRET`、公网 HTTPS API 与 WSS RPC 地址。首次创建 Owner 时临时启用注册，创建完成后立即关闭。
+使用仓库 `compose.yaml` 部署唯一的 Master，并按 `.env.sample` 设置 `APP_GLOBAL_SECRET` 与唯一的 `PUBLIC_URL`；HTTPS 会自动派生 WSS RPC 地址。首次创建 Owner 时临时启用注册，创建完成后立即关闭。
 
 ## 2. Server（FRPS）
 
@@ -16,6 +16,6 @@ frp-panel 采用 **一个 Master、多个独立 FRPS Server、多个 FRPC Client
 
 ## 4. 创建 Tunnel
 
-打开 **Tunnels → 创建 Tunnel**，直接选择 Client 与 Server，再设置本地服务和公网端口。每个 Client 可创建多条 Tunnel，每条可选择不同 Server；底层 FRPC 连接由 Master 自动创建、复用和回收。
+打开 **Tunnels → 创建 Tunnel**，直接选择 Client 与 Server，再设置本地服务和公网端口。每个 Client 可创建多条 Tunnel，每条可选择不同 Server；Client 在线且双方已完成注册时，Master 会尽力创建并复用底层 FRPC 连接。删除后的连接回收受当前 Client 级移除协议限制，Client 离线时不会由重连事件自动补发 v2 Tunnel 配置。
 
 完整的原始 Compose、环境变量、端口、验收和备份说明见 [部署指南](/deployment)。

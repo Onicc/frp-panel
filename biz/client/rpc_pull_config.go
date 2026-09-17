@@ -36,8 +36,8 @@ func PullConfig(appInstance app.Application, clientID, clientSecret string) erro
 	}
 
 	if len(resp.GetClient().GetOriginClientId()) == 0 {
-		currentClientIDs := ctrl.List()
-		if _, idsToRemove := lo.Difference(resp.GetClient().GetClientIds(), currentClientIDs); len(idsToRemove) > 0 {
+		idsToRemove := expiredLegacyClientIDs(clientID, resp.GetClient().GetClientIds(), ctrl.List())
+		if len(idsToRemove) > 0 {
 			logger.Logger(ctx).Infof("client [%s] has %d expired child clients, remove clientIDs: [%+v]", clientID, len(idsToRemove), idsToRemove)
 			for _, id := range idsToRemove {
 				ctrl.StopByClient(id)
@@ -106,4 +106,19 @@ func PullConfig(appInstance app.Application, clientID, clientSecret string) erro
 
 	logger.Logger(ctx).Infof("pull client config success, clientID: [%s], serverID: [%s]", clientID, serverID)
 	return nil
+}
+
+// expiredLegacyClientIDs returns legacy shadow clients that no longer exist in
+// the configuration returned by Master. The physical client ID is the
+// top-level key used by the v2 controller as well, but it is not a legacy
+// shadow child and must never be removed by this reconciliation.
+func expiredLegacyClientIDs(clientID string, configuredChildIDs, controllerClientIDs []string) []string {
+	configuredChildIDs = lo.Filter(configuredChildIDs, func(id string, _ int) bool {
+		return id != clientID
+	})
+	currentChildIDs := lo.Filter(controllerClientIDs, func(id string, _ int) bool {
+		return id != clientID
+	})
+	_, idsToRemove := lo.Difference(configuredChildIDs, currentChildIDs)
+	return idsToRemove
 }

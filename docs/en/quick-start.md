@@ -4,7 +4,7 @@ frp-panel uses **one Master, multiple independent FRPS Servers, and multiple FRP
 
 ## 1. Master
 
-Deploy the single Master with the repository `compose.yaml`. Configure `APP_GLOBAL_SECRET` and the public HTTPS API/WSS RPC endpoints from `.env.sample`. Enable registration only long enough to create the initial Owner.
+Deploy the single Master with the repository `compose.yaml`. Configure `APP_GLOBAL_SECRET` and the single `PUBLIC_URL` from `.env.sample`; HTTPS derives the WSS RPC endpoint automatically. Enable registration only long enough to create the initial Owner.
 
 ## 2. Server (FRPS)
 
@@ -16,6 +16,6 @@ Open **Clients → Add Client**, select Linux, macOS, or Windows, and run the ge
 
 ## 4. Create a Tunnel
 
-Open **Tunnels → Create Tunnel**, directly select a Client and Server, then configure the local service and public port. A Client may own multiple Tunnels and each may select a different Server; Master automatically creates, shares, and removes the underlying FRPC connections.
+Open **Tunnels → Create Tunnel**, directly select a Client and Server, then configure the local service and public port. A Client may own multiple Tunnels and each may select a different Server; when the Client is online and both resources are enrolled, Master best-effort creates and shares the underlying FRPC connections. Cleanup is limited by the current Client-level removal protocol, and an Agent reconnect does not automatically re-apply v2 Tunnel configuration.
 
 See the [deployment guide](/en/deployment) for raw Compose files, environment settings, ports, acceptance checks, and backup guidance.

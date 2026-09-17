@@ -8,7 +8,7 @@
 | Server（FRPS） | 1 至多个 | 公网数据入口，接收 FRPC 连接和业务流量 | 每台服务器使用 Docker Compose |
 | Client（FRPC） | 1 至多个 | 业务主机，运行 Client Agent 与 Master 管理的 FRPC | 使用控制台生成的系统安装命令 |
 
-一个 Master 管理全部 Server、Client 和 Tunnel。Client 是物理业务主机，Agent 是安装在 Client 上的管理程序。每条 Tunnel 直接选择一个 Client 和一个 Server；Master 按需创建底层 FRPC 连接，同一 Client 与 Server 组合的多条 Tunnel 共用连接。
+一个 Master 管理全部 Server、Client 和 Tunnel。Client 是物理业务主机，Agent 是安装在 Client 上的管理程序。每条 Tunnel 直接选择一个 Client 和一个 Server；Master 保存期望配置并在 Client 在线、双方完成注册时尽力创建底层 FRPC 连接，同一 Client 与 Server 组合的多条 Tunnel 共用连接。
 
 ```text
                          ┌── Server A / FRPS ── 公网入口与 remote ports
@@ -72,12 +72,14 @@ PUBLIC_URL=https://panel.example.com
 - `APP_ENABLE_REGISTER` 只在创建首个 Owner 时设为 `true`，创建后立即改为 `false` 并重新应用 Compose 配置。
 - `PUBLIC_URL` 是唯一需要配置的 Master 公开地址，必须是无路径的完整 `http://` 或 `https://` URL。HTTPS 会自动派生 `wss://` RPC 地址。
 - `APP_AGENT_INSTALL_URL` 仅在使用 fork 或内部镜像时设置；它必须包含 `install.sh` 与 `install.ps1`。
-- 使用 `APP_COOKIE_SECURE=true` 时，浏览器入口必须是 HTTPS；推荐让同机反向代理转发至 `127.0.0.1:9000`，并支持 WebSocket。
+- 生产环境使用 `APP_COOKIE_SECURE=true` 时，必须让 HTTPS 反向代理转发 Web、API 和 WebSocket 流量至 `127.0.0.1:9000`；仓库 Compose 不直接提供公网 TLS。
 - `edge` 会随 `main` 更新；生产环境应固定到已验证的 `v*` 镜像标签。
 
 Master 只需开放 Web/API/RPC 入口，不应映射 `7000` 或任何业务 remote port。
 
-首次打开 `PUBLIC_URL` 时会自动显示“创建首个所有者账户”：填写用户名、邮箱、密码和确认密码后，页面会自动登录并进入控制台，浏览器也能按标准登录表单识别并保存凭据。确认可以重新登录后，将 `APP_ENABLE_REGISTER` 改为 `false` 并重新应用 Compose 配置。登录后可从右上角进入 **账户设置** 修改密码；系统会校验当前密码并在修改成功后要求重新登录。
+首次打开 `PUBLIC_URL` 时先显示登录表单；当 `APP_ENABLE_REGISTER=true` 且数据库中还没有用户时，页面会提供“创建 Owner”的切换入口。填写用户名、邮箱、至少 12 个字符的密码和确认密码后，页面会自动登录并进入控制台。确认可以重新登录后，将 `APP_ENABLE_REGISTER` 改为 `false` 并重新应用 Compose 配置。登录后可从右上角进入 **账户设置** 修改密码；系统会校验当前密码并在修改成功后要求重新登录。
+
+仓库 Compose 只会把文件中 `environment` 列出的变量传入容器。仅把 `APP_ALLOWED_ORIGINS`、`MASTER_*` 或 `DB_*` 写入宿主机 `.env` 不会使它们生效；如需自定义这些变量，必须显式加入 Compose 的 `environment`，并同步调整端口映射和健康检查。
 
 ## 3. 部署一个或多个 Server（FRPS）
 
@@ -96,7 +98,7 @@ Master 只需开放 Web/API/RPC 入口，不应映射 `7000` 或任何业务 rem
 ```yaml
 services:
   frps:
-    image: onicc/frp-panel:edge
+    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:edge}
     restart: unless-stopped
     network_mode: host
     command:
@@ -113,13 +115,13 @@ volumes:
   frp-panel-server-data:
 ```
 
-这里使用 Linux 的 host network，使 FRPS 后续新增任意 TCP/UDP remote port 时不必反复修改容器端口映射。必须在 Server 主机防火墙和云安全组中放行：
+这里使用 Linux 的 host network，使 FRPS 后续新增任意 TCP/UDP remote port 时不必反复修改容器端口映射。生成文件中的 `FRP_PANEL_IMAGE` 会在 Server 主机上由 Compose 解析；生产环境应在该主机的 `.env` 中将它固定到与 Master 匹配的已验证版本。必须在 Server 主机防火墙和云安全组中放行：
 
 - FRPS 绑定端口，例如 `7000/tcp`，供各 Client 连接；
 - 每条 Tunnel 实际使用的 TCP/UDP remote port，供业务访问；
 - Server 到 Master 的 HTTPS/WSS 出站访问。
 
-容器内部的 `127.0.0.1:8999` 仅供 FRPS 鉴权插件使用，不应对外开放。
+由于使用 host network，`127.0.0.1:8999` 是 Server 主机的回环地址，仅供 FRPS 鉴权插件使用，不应对外开放。
 
 Server 必须使用控制台生成的文件，不要手工复制 Master 的 `.env`。首次注册成功后，重启会直接读取数据卷中的受保护凭据。
 
@@ -150,9 +152,9 @@ Client 上线后无需预先绑定 Server。打开 **Tunnels → 创建 Tunnel**
 2. 选择提供公网入口的 Server。
 3. 填写 TCP/UDP、本地地址、本地端口与公网端口并确认。
 
-一台 Client 可以创建多条 Tunnel，每条 Tunnel 可以选择不同 Server。Master 会自动为首次使用的“Client + Server”组合创建 FRPC 连接，同一组合的 Tunnel 共用连接；删除该组合的最后一条 Tunnel 时连接自动回收。Client 与 Server 的底层连接不作为用户资源单独管理。
+一台 Client 可以创建多条 Tunnel，每条 Tunnel 可以选择不同 Server。Master 会保存每条 Tunnel 的期望配置，并在创建或修改时、Client 在线且 Client/Server 已完成注册时，尽力向 Client 下发组装后的 FRPC 配置；同一组合的 Tunnel 共用连接。删除 Tunnel 后，只有当该物理 Client 已没有其他活跃 Tunnel 时，当前协议才会发送 Client 级别的移除事件；如果同一 Client 仍连接其他 Server，不能保证只回收被删除组合的连接。Client 与 Server 的底层连接不作为用户资源单独管理。
 
-公网端口监听在所选 Server（FRPS）上，并转发至所选 Client 能够访问的本地服务；业务流量不会经过 Master。Client 离线时配置仍会保存，并在 Agent 恢复连接后同步。
+公网端口监听在所选 Server（FRPS）上，并转发至所选 Client 能够访问的本地服务；业务流量不会经过 Master。Client 离线时 Tunnel 配置仍会保存，但当前 Agent 重连流程不会自动补发 v2 Tunnel 配置；待 Client 在线后，需要再次修改或提交该 Tunnel 才会触发下发。创建 Tunnel 时本地端口可使用 `1–65535`，Server 绑定端口和 remote port 必须使用 `1024–65535`。
 
 ## 6. 网络端口
 
@@ -170,7 +172,7 @@ Client 上线后无需预先绑定 Server。打开 **Tunnels → 创建 Tunnel**
 - Master 健康检查地址 `/api/v2/health` 可访问，且公开注册已经关闭。
 - 所有 FRPS 在 Server 列表显示在线；Server 主机只开放计划内的绑定端口和 remote ports。
 - 所有 Client Agent 在 Client 列表显示在线；每条 Tunnel 显示正确的 Client、Server 与端口。
-- 已分别备份 Master 的 `frp-panel-data` 卷、每台 Server 的 `frp-panel-server-data` 卷以及 Master 的 `.env`。
+- 已分别备份 Master 的 `frp-panel-data` Compose 卷、每台 Server 的 `frp-panel-server-data` Compose 卷以及 Master 的 `.env`。Docker 实际卷名通常会带 Compose 项目前缀（例如 `<project>_frp-panel-data`），备份前请用 `docker volume ls` 或 `docker volume inspect` 确认。
 - 恢复时保持原 `APP_GLOBAL_SECRET` 和数据卷；不要让两台 FRPS 同时使用同一个 Server 数据卷副本。
 
 上线前同时检查 [安全基线](/SECURITY)、[配置说明](/configuration) 和 [平台支持矩阵](/SUPPORT_MATRIX)。
