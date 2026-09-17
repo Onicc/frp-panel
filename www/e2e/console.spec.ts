@@ -46,7 +46,7 @@ test('authenticated console exposes resource states and controlled dialogs', asy
   await page.getByLabel('密码').fill('correct-password')
   await page.getByRole('button', { name: '继续' }).click()
   await expect(page).toHaveURL('/')
-  await page.getByRole('link', { name: 'Clients', exact: true }).click()
+  await page.getByRole('complementary', { name: 'Primary navigation' }).getByRole('link', { name: 'Clients', exact: true }).click()
   await expect(page.getByText('owner.c.mac')).toBeVisible()
   await page.getByRole('button', { name: '添加 Client' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
