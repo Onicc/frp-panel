@@ -52,10 +52,38 @@ trap 'rm -rf -- "$temp_dir"' EXIT
 binary="$temp_dir/$asset"
 checksum="$temp_dir/checksums.txt"
 
-curl --fail --location --proto '=https' --tlsv1.2 --retry 3 \
-  --output "$binary" "$release_url/$asset"
-curl --fail --location --proto '=https' --tlsv1.2 --retry 3 \
-  --output "$checksum" "$release_url/checksums.txt"
+download_release_asset() {
+  local url="$1"
+  local output="$2"
+  local attempts=1
+
+  # The rolling edge release is replaced by CI. During that short window the
+  # old release may already be gone while the new assets are not available
+  # yet, so retry the complete asset download instead of failing on a 404.
+  if [[ "$version" == "edge" ]]; then
+    attempts=6
+  fi
+
+  while (( attempts > 0 )); do
+    if curl --fail --location --proto '=https' --tlsv1.2 --retry 3 \
+      --output "$output" "$url"; then
+      return 0
+    fi
+
+    attempts=$((attempts - 1))
+    if (( attempts > 0 )); then
+      echo "Release asset is not available yet; retrying in 10 seconds ($attempts attempts left)" >&2
+      sleep 10
+    fi
+  done
+
+  echo "Unable to download release asset: $url" >&2
+  echo "The $version release may still be publishing, or may not contain an asset for $(uname -s)/$(uname -m)." >&2
+  return 1
+}
+
+download_release_asset "$release_url/$asset" "$binary"
+download_release_asset "$release_url/checksums.txt" "$checksum"
 
 expected="$(awk -v asset="$asset" '$2 == asset {print $1}' "$checksum")"
 [[ -n "$expected" ]] || { echo "Asset is missing from checksums.txt" >&2; exit 1; }

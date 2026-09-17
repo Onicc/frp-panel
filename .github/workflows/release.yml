@@ -103,9 +103,28 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete edge --yes --cleanup-tag || true
-          gh release create edge --target "$GITHUB_SHA" dist/upload/* \
-            --prerelease --title "edge" --notes "Automated build from main at $GITHUB_SHA"
+          set -euo pipefail
+          release_notes="Automated build from main at $GITHUB_SHA"
+
+          for attempt in 1 2 3 4 5; do
+            # Replacing a rolling release is not atomic. Clean up both the
+            # release and an orphaned edge tag before retrying creation.
+            gh release delete edge --yes --cleanup-tag >/dev/null 2>&1 || true
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/edge" >/dev/null 2>&1 || true
+
+            if gh release create edge --target "$GITHUB_SHA" dist/upload/* \
+              --prerelease --title "edge" --notes "$release_notes"; then
+              exit 0
+            fi
+
+            if (( attempt < 5 )); then
+              echo "Rolling edge release publish failed; retrying in 15 seconds (attempt $(( attempt + 1 ))/5)" >&2
+              sleep 15
+            fi
+          done
+
+          echo "Failed to publish rolling edge release after 5 attempts" >&2
+          exit 1
 
   images:
     needs: verify
