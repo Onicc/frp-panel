@@ -3,6 +3,11 @@ import { ref } from 'vue'
 
 export const locale = ref<'zh-CN' | 'en'>((localStorage.getItem('frp-panel.locale') as 'zh-CN'|'en') || 'zh-CN')
 
+export const availableLocales = [
+  { code: 'zh-CN', name: '中文', flag: '🇨🇳' },
+  { code: 'en', name: 'English', flag: '🇺🇸' },
+] as const
+
 const rawMessages = {
   'zh-CN': {
     nav: { master:'Master 控制台', masterHint:'控制平面', overview:'概览', clients:'Clients', servers:'Servers', tunnels:'Tunnels', openMenu:'打开菜单' },

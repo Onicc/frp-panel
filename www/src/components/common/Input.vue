@@ -1,7 +1,18 @@
 <template>
   <label>
     <span v-if="label">{{ label }}<em v-if="required"> *</em></span>
+    <span v-if="icon" class="input-with-icon">
+      <Icon :name="icon" size="sm" aria-hidden="true" />
+      <input
+        v-bind="$attrs"
+        :required="required"
+        :value="modelValue"
+        :class="{'error-field': !!error}"
+        @input="onInput"
+      />
+    </span>
     <input
+      v-else
       v-bind="$attrs"
       :required="required"
       :value="modelValue"
@@ -26,6 +37,7 @@ const props = withDefaults(defineProps<{
   required?: boolean
   hint?: string
   error?: string
+  icon?: string
   modelModifiers?: { number?: boolean; trim?: boolean }
 }>(), { modelValue: '', required: false })
 

@@ -1,37 +1,38 @@
 <template>
-  <aside class="sidebar" :class="{open: mobileOpen}" aria-label="Primary navigation">
-    <RouterLink to="/" class="brand" tabindex="0">
-      <div class="brand-logo" aria-hidden="true">
-        <Icon name="topology" size="sm" />
-      </div>
-      <div class="brand-name">
-        <strong>frp-panel</strong>
-        <small>{{ t('nav.masterHint') }}</small>
-      </div>
-    </RouterLink>
+  <aside class="sidebar" :class="{ open: mobileOpen }" aria-label="Primary navigation">
+    <div class="sidebar-header">
+      <RouterLink to="/" class="brand" @click="emit('close')">
+        <span class="brand-logo" aria-hidden="true"><Icon name="server" size="sm" /></span>
+        <span class="brand-name">
+          <strong>frp-panel</strong>
+          <small>{{ t('nav.masterHint') }}</small>
+        </span>
+      </RouterLink>
+    </div>
 
-    <nav>
-      <RouterLink to="/" :class="{active: isActive('/')}">
-        <span class="nav-icon" aria-hidden="true"><Icon name="home" size="sm" /></span>
-        {{ t('nav.overview') }}
+    <nav class="sidebar-nav">
+      <p class="sidebar-section-title">{{ t('nav.master') }}</p>
+      <RouterLink to="/" class="sidebar-link" :class="{ active: isActive('/') }" @click="emit('close')">
+        <Icon name="home" size="sm" />
+        <span>{{ t('nav.overview') }}</span>
       </RouterLink>
-      <RouterLink to="/clients" :class="{active: isActive('/clients')}">
-        <span class="nav-icon" aria-hidden="true"><Icon name="users" size="sm" /></span>
-        {{ t('nav.clients') }}
+      <RouterLink to="/clients" class="sidebar-link" :class="{ active: isActive('/clients') }" @click="emit('close')">
+        <Icon name="users" size="sm" />
+        <span>{{ t('nav.clients') }}</span>
       </RouterLink>
-      <RouterLink to="/servers" :class="{active: isActive('/servers')}">
-        <span class="nav-icon" aria-hidden="true"><Icon name="server" size="sm" /></span>
-        {{ t('nav.servers') }}
+      <RouterLink to="/servers" class="sidebar-link" :class="{ active: isActive('/servers') }" @click="emit('close')">
+        <Icon name="server" size="sm" />
+        <span>{{ t('nav.servers') }}</span>
       </RouterLink>
-      <RouterLink to="/tunnels" :class="{active: isActive('/tunnels')}">
-        <span class="nav-icon" aria-hidden="true"><Icon name="arrowsUpDown" size="sm" /></span>
-        {{ t('nav.tunnels') }}
+      <RouterLink to="/tunnels" class="sidebar-link" :class="{ active: isActive('/tunnels') }" @click="emit('close')">
+        <Icon name="arrowsUpDown" size="sm" />
+        <span>{{ t('nav.tunnels') }}</span>
       </RouterLink>
     </nav>
 
-    <div class="sidebar-footnote">
-      <Icon name="shield" size="xs" aria-hidden="true" />
-      <small>v{{ version }}</small>
+    <div class="sidebar-footer">
+      <div class="sidebar-status"><span class="status-pulse"></span><span>FRP {{ version }}</span></div>
+      <span class="sidebar-footer-caption">{{ t('nav.masterHint') }}</span>
     </div>
   </aside>
 
@@ -45,12 +46,8 @@ import Icon from '../icons/Icon.vue'
 
 defineProps<{ mobileOpen?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
-
 const route = useRoute()
 const { t } = useI18n()
-
 const version = import.meta.env.VITE_APP_VERSION || '2'
-
-const isActive = (path: string) =>
-  path === '/' ? route.path === '/' : route.path.startsWith(path)
+const isActive = (path: string) => path === '/' ? route.path === '/' : route.path.startsWith(path)
 </script>

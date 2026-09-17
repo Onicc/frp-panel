@@ -4,9 +4,9 @@
     <p>{{ registering ? t('auth.registerHint') : t('auth.signInHint') }}</p>
 
     <form @submit.prevent="submit" autocomplete="on" novalidate>
-      <Input v-model="form.username" :label="t('auth.username')" name="username" autocomplete="username" required />
+      <Input v-model="form.username" :label="t('auth.username')" icon="user" name="username" autocomplete="username" required />
       <Input v-if="registering" v-model="form.email" :label="t('auth.email')" name="email" type="email" autocomplete="email" required />
-      <Input v-model="form.password" :label="t('auth.password')" name="password" type="password" :autocomplete="registering ? 'new-password' : 'current-password'" required />
+      <Input v-model="form.password" :label="t('auth.password')" icon="lock" name="password" type="password" :autocomplete="registering ? 'new-password' : 'current-password'" required />
       <Input v-if="registering" v-model="form.confirm" :label="t('auth.confirmPassword')" name="confirm-password" type="password" autocomplete="new-password" required />
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <button class="button primary" type="submit" :disabled="busy" style="width:100%">

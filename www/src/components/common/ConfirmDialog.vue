@@ -6,7 +6,24 @@
   </BaseDialog>
 </template>
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import BaseDialog from './BaseDialog.vue'
-withDefaults(defineProps<{ show: boolean; title: string; message: string; error?: string; confirmLabel?: string; cancelLabel?: string; busy?: boolean; busyLabel?: string }>(), { error: '', confirmLabel: 'Confirm', cancelLabel: 'Cancel', busy: false, busyLabel: 'Working…' })
+
+const props = withDefaults(defineProps<{
+  show: boolean
+  title: string
+  message: string
+  error?: string
+  confirmLabel?: string
+  cancelLabel?: string
+  busy?: boolean
+  busyLabel?: string
+}>(), { error: '', busy: false })
+
+const { t } = useI18n()
+const confirmLabel = computed(() => props.confirmLabel || t('common.confirm'))
+const cancelLabel = computed(() => props.cancelLabel || t('common.cancel'))
+const busyLabel = computed(() => props.busyLabel || t('common.loading'))
 const emit = defineEmits<{ confirm: []; cancel: [] }>()
 </script>
