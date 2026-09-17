@@ -95,10 +95,10 @@ fi
 [[ "$actual" == "$expected" ]] || { echo "Checksum verification failed" >&2; exit 1; }
 chmod 0755 "$binary"
 
-runner=()
-if [[ "$(id -u)" -ne 0 ]]; then
-  runner=(sudo)
+if [[ "$(id -u)" -eq 0 ]]; then
+  "$binary" service install "${agent_args[@]}"
+else
+  sudo "$binary" service install "${agent_args[@]}"
 fi
-"${runner[@]}" "$binary" service install "${agent_args[@]}"
 
 echo "frp-panel-agent installed successfully; no files were written to $(pwd)."
