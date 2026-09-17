@@ -3,7 +3,7 @@ import { ref } from 'vue'
 
 export const locale = ref<'zh-CN' | 'en'>((localStorage.getItem('frp-panel.locale') as 'zh-CN'|'en') || 'zh-CN')
 
-export const messages = {
+const rawMessages = {
   'zh-CN': {
     nav: { master:'Master 控制台', masterHint:'统一管理 FRP 数据平面', overview:'概览', clients:'Clients', servers:'Servers', tunnels:'Tunnels' },
     auth: { signIn:'登录 Master', signInHint:'使用账户访问控制平面', register:'创建 Owner 账户', registerHint:'首次部署时创建唯一 Owner', username:'用户名', email:'邮箱', password:'密码', currentPassword:'当前密码', newPassword:'新密码', confirmPassword:'确认密码', submit:'继续', create:'创建账户', logout:'退出登录', switchRegister:'还没有账户？创建 Owner', switchLogin:'返回登录', loading:'处理中…' },
@@ -28,5 +28,22 @@ export const messages = {
   }
 }
 
-export const i18n = createI18n({ legacy:false, locale:locale.value, fallbackLocale:'en', messages })
-export function setLocale(next: string) { const value = next === 'en' ? 'en' : 'zh-CN'; locale.value = value; i18n.global.locale.value = value; localStorage.setItem('frp-panel.locale', value); document.documentElement.lang = value }
+/**
+ * Keep messages as static functions so the runtime-only vue-i18n build never
+ * needs to compile strings with `new Function`. This is required by the
+ * console's strict Content-Security-Policy (`unsafe-eval` is intentionally
+ * disabled).
+ */
+const toStaticMessages = (value: unknown): unknown => {
+  if (typeof value === 'string') return () => value
+  if (Array.isArray(value)) return value.map(toStaticMessages)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, toStaticMessages(child)]))
+  }
+  return value
+}
+
+export const messages = toStaticMessages(rawMessages)
+
+export const i18n = createI18n({ legacy:false, locale:locale.value, fallbackLocale:'en', messages: messages as any })
+export function setLocale(next: string) { const value = next === 'en' ? 'en' : 'zh-CN'; locale.value = value; (i18n.global.locale as { value: string }).value = value; localStorage.setItem('frp-panel.locale', value); document.documentElement.lang = value }
