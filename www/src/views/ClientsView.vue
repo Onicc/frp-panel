@@ -6,7 +6,8 @@
         <p>{{ t('clients.description') }}</p>
       </div>
       <div class="header-actions">
-        <button class="button secondary" type="button" @click="load"><Icon name="refresh" size="sm" />{{ t('common.refresh') }}</button>
+        <span class="auto-refresh-hint" :class="{ refreshing }"><span class="live-dot" aria-hidden="true"></span>{{ t('common.autoRefresh') }}</span>
+        <button class="button secondary" type="button" @click="load()"><Icon name="refresh" size="sm" />{{ t('common.refresh') }}</button>
         <button class="button primary" type="button" @click="openCreate"><Icon name="plus" size="sm" />{{ t('clients.create') }}</button>
       </div>
     </div>
@@ -39,15 +40,8 @@
     <div class="table-page-layout">
       <div class="filters">
         <SearchInput v-model="search" :placeholder="t('common.search')" />
-        <Select v-model="stateFilter" :label="t('clients.state')">
-          <option value="">{{ t('clients.state') }}</option>
-          <option value="configured">{{ t('common.configured') }}</option>
-          <option value="unconfigured">{{ t('common.unconfigured') }}</option>
-        </Select>
-        <Select v-model="statusFilter" :label="t('clients.status')">
-          <option value="">{{ t('clients.status') }}</option>
-          <option v-for="value in statuses" :key="value" :value="value">{{ t(`common.${value}`) }}</option>
-        </Select>
+        <Select v-model="stateFilter" :label="t('clients.state')" :options="stateOptions" />
+        <Select v-model="statusFilter" :label="t('clients.status')" :options="statusOptions" />
       </div>
 
       <DataTable>
@@ -98,8 +92,8 @@
       <form @submit.prevent="saveClient">
         <Input v-model="form.clientId" :label="t('clients.id')" :disabled="dialog === 'edit'" required />
         <Input v-model="form.comment" :label="t('clients.comment')" />
-        <div v-if="dialog === 'edit'" class="inline-toggle">
-          <span>{{ t('common.enabled') }}</span>
+        <div v-if="dialog === 'edit'" class="inline-toggle form-toggle">
+          <span class="toggle-copy"><strong>{{ t('common.enabled') }}</strong><small>{{ t('clients.enabledHint') }}</small></span>
           <Toggle v-model="form.enabled" />
         </div>
         <p v-if="modalError" class="error" role="alert">{{ modalError }}</p>
@@ -143,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   BaseDialog, ConfirmDialog, DataTable, EmptyState,
@@ -152,12 +146,12 @@ import {
 import Icon from '../components/icons/Icon.vue'
 import { api, APIError, type Client } from '../api'
 import { useToastStore } from '../stores/toast'
+import { useAutoRefresh } from '../composables/useAutoRefresh'
 
 const { t } = useI18n()
 const toast = useToastStore()
 
 const rows     = ref<Client[]>([])
-const loading  = ref(false)
 const busy     = ref(false)
 const page     = ref(1)
 const pageSize = 25
@@ -180,26 +174,32 @@ const latestInstall = computed(() =>
   enrollmentCommands.value[platform.value] || enrollmentCommands.value.linux || ''
 )
 const statuses = ['pending', 'online', 'offline', 'error', 'disabled']
+const stateOptions = computed(() => [
+  { value: '', label: t('clients.allConfiguration') },
+  { value: 'configured', label: t('common.configured') },
+  { value: 'unconfigured', label: t('common.unconfigured') },
+])
+const statusOptions = computed(() => [
+  { value: '', label: t('clients.allStatus') },
+  ...statuses.map((value) => ({ value, label: t(`common.${value}`) })),
+])
 const form = reactive({ clientId: '', comment: '', enabled: true, acknowledge: false })
 
 const deleteMessage = computed(() =>
   selected.value ? `${t('clients.deleteHint')} ${selected.value.id}` : t('clients.deleteHint')
 )
 
-const load = async () => {
-  loading.value = true
+const loadData = async () => {
   try {
     const result = await api.clients({ page: page.value, pageSize, search: search.value, configurationState: stateFilter.value, status: statusFilter.value })
     rows.value  = result.items
     total.value = result.total
   } catch (e) {
     toast.show(e instanceof APIError ? e.message : t('common.error'), 'error')
-  } finally {
-    loading.value = false
   }
 }
-watch([search, stateFilter, statusFilter], () => { page.value = 1; load() })
-onMounted(load)
+const { loading, refreshing, refresh: load } = useAutoRefresh(loadData)
+watch([search, stateFilter, statusFilter], () => { page.value = 1; void load() })
 
 const reset = () => { form.clientId = ''; form.comment = ''; form.enabled = true; form.acknowledge = false; modalError.value = '' }
 const closeDialog    = () => { dialog.value = ''; reset() }

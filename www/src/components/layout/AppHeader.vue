@@ -11,6 +11,7 @@
     </div>
 
     <div class="topbar-actions">
+      <ThemeSwitcher />
       <LocaleSwitcher />
       <div v-if="auth.user" ref="menuRef" class="user-menu">
         <button
@@ -52,7 +53,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../../stores/auth'
-import { LocaleSwitcher } from '../common'
+import { LocaleSwitcher, ThemeSwitcher } from '../common'
 import Icon from '../icons/Icon.vue'
 
 defineProps<{ title: string }>()

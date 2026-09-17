@@ -6,7 +6,8 @@
         <p>{{ t('tunnels.description') }}</p>
       </div>
       <div class="header-actions">
-        <button class="button secondary" type="button" @click="load"><Icon name="refresh" size="sm" />{{ t('common.refresh') }}</button>
+        <span class="auto-refresh-hint" :class="{ refreshing }"><span class="live-dot" aria-hidden="true"></span>{{ t('common.autoRefresh') }}</span>
+        <button class="button secondary" type="button" @click="load()"><Icon name="refresh" size="sm" />{{ t('common.refresh') }}</button>
         <button class="button primary" type="button" :disabled="!clients.length || !servers.length" @click="openCreate">
           <Icon name="plus" size="sm" />{{ t('tunnels.create') }}
         </button>
@@ -25,10 +26,7 @@
     <div class="table-page-layout">
       <div class="filters">
         <SearchInput v-model="search" :placeholder="t('common.search')" />
-        <Select v-model="statusFilter" :label="t('tunnels.status')">
-          <option value="">{{ t('tunnels.status') }}</option>
-          <option v-for="value in statuses" :key="value" :value="value">{{ t(`common.${value}`) }}</option>
-        </Select>
+        <Select v-model="statusFilter" :label="t('tunnels.status')" :options="statusOptions" />
       </div>
 
       <DataTable>
@@ -80,24 +78,15 @@
       <form @submit.prevent="save">
         <div class="form-grid">
           <Input v-model="form.name" :label="t('tunnels.name')" required />
-          <Select v-model="form.type" :label="t('tunnels.type')" required>
-            <option value="tcp">TCP</option>
-            <option value="udp">UDP</option>
-          </Select>
-          <Select v-model="form.clientId" :label="t('tunnels.client')" required>
-            <option value="" disabled>{{ t('tunnels.client') }}</option>
-            <option v-for="item in clients" :key="item.id" :value="item.id">{{ item.id }} · {{ item.configurationState }}</option>
-          </Select>
-          <Select v-model="form.serverId" :label="t('tunnels.server')" required>
-            <option value="" disabled>{{ t('tunnels.server') }}</option>
-            <option v-for="item in servers" :key="item.id" :value="item.id">{{ item.id }} · {{ item.configurationState }}</option>
-          </Select>
+          <Select v-model="form.type" :label="t('tunnels.type')" :options="typeOptions" required />
+          <Select v-model="form.clientId" :label="t('tunnels.client')" :options="clientOptions" :placeholder="t('tunnels.client')" required />
+          <Select v-model="form.serverId" :label="t('tunnels.server')" :options="serverOptions" :placeholder="t('tunnels.server')" required />
           <Input v-model="form.localHost" :label="t('tunnels.localHost')" required />
           <Input v-model.number="form.localPort" :label="t('tunnels.localPort')" type="number" min="1" max="65535" required />
           <Input v-model.number="form.remotePort" :label="t('tunnels.remotePort')" type="number" min="1024" max="65535" required />
         </div>
-        <div class="inline-toggle">
-          <span>{{ t('common.enabled') }}</span>
+        <div class="inline-toggle form-toggle">
+          <span class="toggle-copy"><strong>{{ t('common.enabled') }}</strong><small>{{ t('tunnels.enabledHint') }}</small></span>
           <Toggle v-model="form.enabled" />
         </div>
         <p v-if="modalError" class="error" role="alert">{{ modalError }}</p>
@@ -111,7 +100,8 @@
     <ConfirmDialog
       :show="dialog === 'delete'"
       :title="t('tunnels.deleteTitle')"
-      :message="selected ? selected.name : ''"
+      :message="deleteMessage"
+      :warning="t('tunnels.deleteWarning')"
       :error="modalError"
       :busy="busy"
       @cancel="closeDialog"
@@ -121,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   BaseDialog, ConfirmDialog, DataTable, EmptyState,
@@ -130,6 +120,7 @@ import {
 import Icon from '../components/icons/Icon.vue'
 import { api, APIError, type Client, type Server, type Tunnel } from '../api'
 import { useToastStore } from '../stores/toast'
+import { useAutoRefresh } from '../composables/useAutoRefresh'
 
 const { t } = useI18n()
 const toast = useToastStore()
@@ -137,7 +128,6 @@ const toast = useToastStore()
 const rows    = ref<Tunnel[]>([])
 const clients = ref<Client[]>([])
 const servers = ref<Server[]>([])
-const loading = ref(false)
 const busy    = ref(false)
 const page     = ref(1)
 const pageSize = 25
@@ -148,12 +138,31 @@ const dialog   = ref<'create'|'edit'|'delete'|''>('')
 const selected = ref<Tunnel>()
 const modalError   = ref('')
 const statuses = ['pending', 'online', 'offline', 'error', 'disabled']
+const statusOptions = computed(() => [
+  { value: '', label: t('tunnels.allStatus') },
+  ...statuses.map((value) => ({ value, label: t(`common.${value}`) })),
+])
+const typeOptions = computed(() => [
+  { value: 'tcp', label: 'TCP', description: 'Transmission Control Protocol' },
+  { value: 'udp', label: 'UDP', description: 'User Datagram Protocol' },
+])
+const clientOptions = computed(() => clients.value.map((item) => ({
+  value: item.id,
+  label: item.id,
+  description: `${t('clients.state')}: ${t(`common.${item.configurationState}`)} · ${t('clients.status')}: ${t(`common.${item.status}`)}`,
+})))
+const serverOptions = computed(() => servers.value.map((item) => ({
+  value: item.id,
+  label: item.id,
+  description: `${t('servers.state')}: ${t(`common.${item.configurationState}`)} · ${t('servers.status')}: ${t(`common.${item.status}`)}`,
+})))
 const form = reactive({ name: '', clientId: '', serverId: '', type: 'tcp', localHost: '127.0.0.1', localPort: 80, remotePort: 8080, enabled: true })
+
+const deleteMessage = computed(() => selected.value ? `${t('tunnels.deleteMessage')} ${selected.value.name}` : '')
 
 const shortId = (id: string) => id.split('.').pop() || id
 
-const load = async () => {
-  loading.value = true
+const loadData = async () => {
   try {
     const [tunnelPage, clientPage, serverPage] = await Promise.all([
       api.tunnels({ page: page.value, pageSize, search: search.value, status: statusFilter.value }),
@@ -166,12 +175,10 @@ const load = async () => {
     servers.value = serverPage.items
   } catch (e) {
     toast.show(e instanceof APIError ? e.message : t('common.error'), 'error')
-  } finally {
-    loading.value = false
   }
 }
-watch([search, statusFilter], () => { page.value = 1; load() })
-onMounted(load)
+const { loading, refreshing, refresh: load } = useAutoRefresh(loadData)
+watch([search, statusFilter], () => { page.value = 1; void load() })
 
 const reset = () => {
   form.name = ''; form.clientId = clients.value[0]?.id || ''; form.serverId = servers.value[0]?.id || ''

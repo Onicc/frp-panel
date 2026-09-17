@@ -6,7 +6,8 @@
         <p>{{ t('servers.description') }}</p>
       </div>
       <div class="header-actions">
-        <button class="button secondary" type="button" @click="load"><Icon name="refresh" size="sm" />{{ t('common.refresh') }}</button>
+        <span class="auto-refresh-hint" :class="{ refreshing }"><span class="live-dot" aria-hidden="true"></span>{{ t('common.autoRefresh') }}</span>
+        <button class="button secondary" type="button" @click="load()"><Icon name="refresh" size="sm" />{{ t('common.refresh') }}</button>
         <button class="button primary" type="button" @click="openCreate"><Icon name="plus" size="sm" />{{ t('servers.create') }}</button>
       </div>
     </div>
@@ -30,15 +31,8 @@
       <!-- Filters -->
       <div class="filters">
         <SearchInput v-model="search" :placeholder="t('common.search')" />
-        <Select v-model="stateFilter" :label="t('servers.state')">
-          <option value="">{{ t('servers.state') }}</option>
-          <option value="configured">{{ t('common.configured') }}</option>
-          <option value="unconfigured">{{ t('common.unconfigured') }}</option>
-        </Select>
-        <Select v-model="statusFilter" :label="t('servers.status')">
-          <option value="">{{ t('servers.status') }}</option>
-          <option v-for="value in statuses" :key="value" :value="value">{{ t(`common.${value}`) }}</option>
-        </Select>
+        <Select v-model="stateFilter" :label="t('servers.state')" :options="stateOptions" />
+        <Select v-model="statusFilter" :label="t('servers.status')" :options="statusOptions" />
       </div>
 
       <DataTable>
@@ -134,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   BaseDialog, ConfirmDialog, DataTable, EmptyState,
@@ -143,12 +137,12 @@ import {
 import Icon from '../components/icons/Icon.vue'
 import { api, APIError, type Server } from '../api'
 import { useToastStore } from '../stores/toast'
+import { useAutoRefresh } from '../composables/useAutoRefresh'
 
 const { t } = useI18n()
 const toast = useToastStore()
 
 const rows     = ref<Server[]>([])
-const loading  = ref(false)
 const busy     = ref(false)
 const page     = ref(1)
 const pageSize = 25
@@ -161,27 +155,33 @@ const selected = ref<Server>()
 const modalError   = ref('')
 const copied       = ref(false)
 const latestCompose = ref('')
-const statuses = ['pending', 'online', 'offline', 'error']
+const statuses = ['pending', 'online', 'offline', 'error', 'disabled']
+const stateOptions = computed(() => [
+  { value: '', label: t('servers.allConfiguration') },
+  { value: 'configured', label: t('common.configured') },
+  { value: 'unconfigured', label: t('common.unconfigured') },
+])
+const statusOptions = computed(() => [
+  { value: '', label: t('servers.allStatus') },
+  ...statuses.map((value) => ({ value, label: t(`common.${value}`) })),
+])
 const form = reactive({ serverId: '', address: '', bindPort: 7000, comment: '', acknowledge: false })
 
 const deleteMessage = computed(() =>
   selected.value ? `${t('servers.deleteHint')} ${selected.value.id}` : t('servers.deleteHint')
 )
 
-const load = async () => {
-  loading.value = true
+const loadData = async () => {
   try {
     const result = await api.servers({ page: page.value, pageSize, search: search.value, configurationState: stateFilter.value, status: statusFilter.value })
     rows.value  = result.items
     total.value = result.total
   } catch (e) {
     toast.show(e instanceof APIError ? e.message : t('common.error'), 'error')
-  } finally {
-    loading.value = false
   }
 }
-watch([search, stateFilter, statusFilter], () => { page.value = 1; load() })
-onMounted(load)
+const { loading, refreshing, refresh: load } = useAutoRefresh(loadData)
+watch([search, stateFilter, statusFilter], () => { page.value = 1; void load() })
 
 const reset = () => { form.serverId = ''; form.address = ''; form.bindPort = 7000; form.comment = ''; form.acknowledge = false; modalError.value = '' }
 const closeDialog = () => { dialog.value = ''; reset() }

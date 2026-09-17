@@ -6,9 +6,12 @@
         <h1>{{ t('overview.title') }}</h1>
         <p>{{ t('overview.description') }}</p>
       </div>
-      <button class="button secondary" type="button" :disabled="busy" @click="load">
-        <Icon name="refresh" size="sm" />{{ t('common.refresh') }}
-      </button>
+      <div class="header-actions">
+        <span class="auto-refresh-hint" :class="{ refreshing }"><span class="live-dot" aria-hidden="true"></span>{{ t('common.autoRefresh') }}</span>
+        <button class="button secondary" type="button" :disabled="busy" @click="load()">
+          <Icon name="refresh" size="sm" />{{ t('common.refresh') }}
+        </button>
+      </div>
     </div>
 
     <div class="status-bar">
@@ -110,12 +113,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '../components/icons/Icon.vue'
 import { api } from '../api'
 import { useToastStore } from '../stores/toast'
 import type { Client, Server } from '../api'
+import { useAutoRefresh } from '../composables/useAutoRefresh'
 
 const { t } = useI18n()
 const toast = useToastStore()
@@ -128,9 +132,8 @@ const data = reactive({
   serverBreakdown: [] as { status: string; count: number }[],
   tunnelBreakdown: [] as { status: string; count: number }[],
 })
-const busy = ref(false)
-const topoClients = ref<Client[]>([])
-const topoServers = ref<Server[]>([])
+const topoClients = reactive<Client[]>([])
+const topoServers = reactive<Server[]>([])
 
 const shortId = (id: string) => id.split('.').pop()?.slice(0, 8) || id.slice(0, 8)
 
@@ -151,8 +154,7 @@ const breakdown = (items: { status: string }[]) => {
     .slice(0, 4)
 }
 
-const load = async () => {
-  busy.value = true
+const loadData = async () => {
   try {
     const [overview, clientPage, serverPage] = await Promise.all([
       api.overview(),
@@ -167,14 +169,12 @@ const load = async () => {
       serverBreakdown: breakdown(serverPage.items),
       tunnelBreakdown: [],
     })
-    topoClients.value = clientPage.items.slice(0, 8)
-    topoServers.value = serverPage.items.slice(0, 5)
+    topoClients.splice(0, topoClients.length, ...clientPage.items.slice(0, 8))
+    topoServers.splice(0, topoServers.length, ...serverPage.items.slice(0, 5))
   } catch {
     toast.show(t('common.error'), 'error')
-  } finally {
-    busy.value = false
   }
 }
 
-onMounted(load)
+const { loading: busy, refreshing, refresh: load } = useAutoRefresh(loadData)
 </script>
