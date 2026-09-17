@@ -2,10 +2,10 @@
   <aside class="sidebar" :class="{ open: mobileOpen }" aria-label="Primary navigation">
     <div class="sidebar-header">
       <RouterLink to="/" class="brand" @click="emit('close')">
-        <span class="brand-logo" aria-hidden="true"><Icon name="server" size="sm" /></span>
+        <span class="brand-logo" aria-hidden="true"><img src="/frppanel-logo.svg" alt="" /></span>
         <span class="brand-name">
-          <strong>frp-panel</strong>
-          <small>{{ t('nav.masterHint') }}</small>
+          <strong>{{ t('brand.name') }}</strong>
+          <small>{{ t('brand.description') }}</small>
         </span>
       </RouterLink>
     </div>

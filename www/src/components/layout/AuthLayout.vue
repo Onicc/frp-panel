@@ -6,16 +6,14 @@
 
     <div class="auth-content">
       <RouterLink to="/login" class="auth-brand">
-        <span class="auth-brand-icon" aria-hidden="true"><Icon name="server" size="md" /></span>
-        <span>
-          <strong>frp-panel</strong>
-          <small>{{ t('nav.masterHint') }}</small>
-        </span>
+        <img class="auth-brand-logo" src="/frppanel-logo.svg" alt="" />
+        <strong>{{ t('brand.name') }}</strong>
+        <small>{{ t('brand.description') }}</small>
       </RouterLink>
 
       <section class="auth-card"><slot /></section>
       <div class="auth-footer"><slot name="footer" /></div>
-      <p class="auth-copyright">© {{ year }} frp-panel</p>
+      <p class="auth-copyright">© {{ year }} {{ t('brand.name') }}</p>
     </div>
   </div>
 </template>
@@ -23,7 +21,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Icon from '../icons/Icon.vue'
 
 const { t } = useI18n()
 const year = computed(() => new Date().getFullYear())

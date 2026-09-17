@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">FrpPanel Minimal Adaptive Logo</title>
+  <desc id="desc">A transparent minimalist abstract mark for FrpPanel, designed to remain visible on both light and dark backgrounds.</desc>
+
+  <!-- Transparent background -->
+
+  <!-- Abstract tunnel / bidirectional connection -->
+  <path
+    d="M154 176
+       H214
+       C246 176 266 198 266 226
+       V286
+       C266 314 286 336 318 336
+       H358"
+    fill="none"
+    stroke="#0EA5E9"
+    stroke-width="34"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <path
+    d="M358 176
+       H298
+       C266 176 246 198 246 226
+       V286
+       C246 314 226 336 194 336
+       H154"
+    fill="none"
+    stroke="#6366F1"
+    stroke-width="34"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+</svg>

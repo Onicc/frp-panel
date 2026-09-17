@@ -10,6 +10,7 @@ export const availableLocales = [
 
 const rawMessages = {
   'zh-CN': {
+    brand: { name:'frp-panel', description:'安全隧道控制平面' },
     nav: { master:'Master 控制台', masterHint:'控制平面', overview:'概览', clients:'Clients', servers:'Servers', tunnels:'Tunnels', openMenu:'打开菜单' },
     theme: { title:'主题', system:'跟随系统', systemHint:'使用系统外观设置', light:'浅色', lightHint:'白色背景与深色文字', dark:'深色', darkHint:'黑色背景与浅色文字' },
     auth: { signIn:'登录 Master', signInHint:'使用账户访问控制平面', register:'创建 Owner 账户', registerHint:'首次部署时创建唯一 Owner', username:'用户名', email:'邮箱', password:'密码', currentPassword:'当前密码', newPassword:'新密码', confirmPassword:'确认密码', submit:'继续', create:'创建账户', logout:'退出登录', switchRegister:'还没有账户？创建 Owner', switchLogin:'返回登录', loading:'处理中…' },
@@ -22,6 +23,7 @@ const rawMessages = {
     problems: { dependencies:'存在依赖 Tunnel', immutable:'ID 不可修改', required:'请填写必填项' }
   },
   en: {
+    brand: { name:'frp-panel', description:'Secure tunnel control plane' },
     nav: { master:'Master console', masterHint:'Control plane', overview:'Overview', clients:'Clients', servers:'Servers', tunnels:'Tunnels', openMenu:'Open menu' },
     theme: { title:'Theme', system:'System', systemHint:'Follow your system preference', light:'Light', lightHint:'White surfaces and dark text', dark:'Dark', darkHint:'Dark surfaces and light text' },
     auth: { signIn:'Sign in to Master', signInHint:'Use your account to access the control plane', register:'Create Owner account', registerHint:'Create the only Owner during first setup', username:'Username', email:'Email', password:'Password', currentPassword:'Current password', newPassword:'New password', confirmPassword:'Confirm password', submit:'Continue', create:'Create account', logout:'Sign out', switchRegister:'Need an account? Create Owner', switchLogin:'Back to sign in', loading:'Working…' },

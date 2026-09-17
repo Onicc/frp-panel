@@ -6,7 +6,7 @@
       </button>
       <div class="header-title-block">
         <h1>{{ title }}</h1>
-        <span class="header-kicker">frp-panel</span>
+        <span class="header-kicker">{{ t('brand.name') }}</span>
       </div>
     </div>
 
