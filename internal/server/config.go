@@ -15,10 +15,11 @@ const ConfigVersion = 2
 // the permanent credential in a mode-0600 volume file avoids exposing it in a
 // Compose file, process arguments, or the Master database.
 type Config struct {
-	Version     int         `yaml:"version"`
-	Master      Master      `yaml:"master"`
-	Credentials Credentials `yaml:"credentials"`
-	TLS         TLS         `yaml:"tls"`
+	Version             int         `yaml:"version"`
+	Master              Master      `yaml:"master"`
+	Credentials         Credentials `yaml:"credentials"`
+	TLS                 TLS         `yaml:"tls"`
+	EnrollmentTokenHash string      `yaml:"enrollment_token_hash,omitempty"`
 }
 
 type Master struct {

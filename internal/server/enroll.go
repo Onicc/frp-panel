@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/Onicc/frp-panel/utils"
 )
 
 type EnrollmentResult struct {
@@ -33,7 +35,30 @@ func Resolve(options ResolveOptions) (Config, error) {
 		return Config{}, fmt.Errorf("server config path is required")
 	}
 	if _, err := os.Stat(options.ConfigPath); err == nil {
-		return ReadConfig(options.ConfigPath)
+		persisted, readErr := ReadConfig(options.ConfigPath)
+		if readErr != nil {
+			return Config{}, readErr
+		}
+		if options.EnrollmentToken == "" {
+			return persisted, nil
+		}
+		if persisted.EnrollmentTokenHash != "" && utils.CheckCredential(options.EnrollmentToken, persisted.EnrollmentTokenHash) {
+			return persisted, nil
+		}
+
+		// A changed token means the Master credential was rotated or the Server
+		// record was recreated. Re-enroll before starting RPC so a stale volume
+		// cannot produce an endless "invalid secret" loop. Older config files do
+		// not contain the fingerprint; try migration, but keep their working
+		// credentials when the one-use token is already consumed.
+		refreshed, enrollErr := enrollAndWrite(options, persisted)
+		if enrollErr == nil {
+			return refreshed, nil
+		}
+		if persisted.EnrollmentTokenHash == "" {
+			return persisted, nil
+		}
+		return Config{}, enrollErr
 	} else if !os.IsNotExist(err) {
 		return Config{}, fmt.Errorf("inspect server config: %w", err)
 	}
@@ -45,15 +70,37 @@ func Resolve(options ResolveOptions) (Config, error) {
 		TLS:         TLS{InsecureSkipVerify: options.Insecure},
 	}
 	if options.EnrollmentToken != "" {
-		enrollment, err := Enroll(result.Master.APIURL, options.EnrollmentToken, options.Insecure)
-		if err != nil {
-			return Config{}, fmt.Errorf("enroll server: %w", err)
-		}
-		result.Credentials.ServerID = enrollment.ServerID
-		result.Credentials.Secret = enrollment.Secret
+		return enrollAndWrite(options, result)
 	}
 	if err := result.Validate(); err != nil {
 		return Config{}, fmt.Errorf("server is not enrolled and no valid persisted configuration exists: %w", err)
+	}
+	if err := WriteConfig(options.ConfigPath, result); err != nil {
+		return Config{}, err
+	}
+	return result, nil
+}
+
+func enrollAndWrite(options ResolveOptions, result Config) (Config, error) {
+	apiURL := strings.TrimSpace(options.APIURL)
+	if apiURL == "" {
+		apiURL = result.Master.APIURL
+	}
+	rpcURL := strings.TrimSpace(options.RPCURL)
+	if rpcURL == "" {
+		rpcURL = result.Master.RPCURL
+	}
+	enrollment, err := Enroll(apiURL, options.EnrollmentToken, options.Insecure)
+	if err != nil {
+		return Config{}, fmt.Errorf("enroll server: %w", err)
+	}
+	result.Master.APIURL = apiURL
+	result.Master.RPCURL = rpcURL
+	result.Credentials.ServerID = enrollment.ServerID
+	result.Credentials.Secret = enrollment.Secret
+	result.EnrollmentTokenHash = utils.HashCredential(options.EnrollmentToken)
+	if err := result.Validate(); err != nil {
+		return Config{}, err
 	}
 	if err := WriteConfig(options.ConfigPath, result); err != nil {
 		return Config{}, err

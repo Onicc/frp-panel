@@ -126,6 +126,8 @@ volumes:
 
 Server 必须使用控制台生成的文件，不要手工复制 Master 的 `.env`。首次注册成功后，重启会直接读取数据卷中的受保护凭据。
 
+如果使用新令牌部署到曾经运行过同一 Server 的数据卷，新版本会检测令牌指纹并自动重新注册；使用同一令牌重启时仍会复用已有凭据。旧版本留下的 `server.yaml` 也会尝试兼容迁移。若日志仍出现 `invalid secret`，请确认复制的是当前 Server 的最新 Compose，并仅删除该 Server 对应的数据卷后重新部署，不要删除 Master 数据卷。
+
 ## 4. 安装一个或多个 Client（FRPC）
 
 Client 不使用手写 Compose 或手工拼接参数：
