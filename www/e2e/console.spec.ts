@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 const user = { username: 'owner', email: 'owner@example.test', role: 'owner' }
 const client = { id: 'owner.c.mac', comment: '', configurationState: 'unconfigured', status: 'pending', enabled: true, tunnelCount: 0 }
 const server = { id: 'owner.s.edge', address: 'edge.example.test', bindPort: 7000, serverApiPort: 8999, comment: '', configurationState: 'unconfigured', status: 'pending', tunnelCount: 0 }
-const strictCSP = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https://basemaps.cartocdn.com https://tiles.basemaps.cartocdn.com; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self' ws: wss: https://basemaps.cartocdn.com https://tiles.basemaps.cartocdn.com https://get.geojs.io"
+const strictCSP = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self' ws: wss: https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://get.geojs.io https://ipwho.is"
 
 async function mockAPI(page: import('@playwright/test').Page) {
   await page.route('**/api/v2/bootstrap-status', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ registrationEnabled: false, ownerExists: true, canCreateOwner: false }) }))
@@ -99,7 +99,11 @@ test('Server creation exposes a configurable API port and blocks equal ports', a
 
 test('overview renders geolocated Client to Server Tunnel topology', async ({ page }) => {
   const pageErrors: string[] = []
+  const mapFailures: string[] = []
   page.on('pageerror', error => pageErrors.push(error.stack || String(error)))
+  page.on('requestfailed', request => {
+    if (/(cartocdn|maplibre-gl-worker|geojs|ipwho)/.test(request.url())) mapFailures.push(`${request.url()} :: ${request.failure()?.errorText}`)
+  })
   await page.route('**/*', async route => {
     if (!route.request().url().startsWith('http://127.0.0.1')) {
       await route.continue()
@@ -134,6 +138,9 @@ test('overview renders geolocated Client to Server Tunnel topology', async ({ pa
   await page.getByRole('button', { name: '继续' }).click()
   await expect(page.getByRole('heading', { name: '网络拓扑' })).toBeVisible()
   await expect(page.locator('.topology-map-shell')).toBeVisible()
+  await expect(page.locator('.maplibregl-canvas')).toBeVisible()
   await expect(page.getByText('ssh · TCP :60000')).toBeVisible()
+  await page.waitForTimeout(1500)
+  expect(mapFailures).toEqual([])
   expect(pageErrors).toEqual([])
 })

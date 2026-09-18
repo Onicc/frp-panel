@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,6 +26,7 @@ var (
 
 type websocketConn struct {
 	ws         *websocket.Conn
+	remoteAddr net.Addr
 	readMutex  sync.Mutex
 	writeMutex sync.Mutex
 	// 缓存由于一次读取没有全部消耗完的数据
@@ -87,6 +89,9 @@ func (c *websocketConn) LocalAddr() net.Addr {
 
 // RemoteAddr 返回远端地址
 func (c *websocketConn) RemoteAddr() net.Addr {
+	if c.remoteAddr != nil {
+		return c.remoteAddr
+	}
 	if conn := c.ws.UnderlyingConn(); conn != nil {
 		return conn.RemoteAddr()
 	}
@@ -112,6 +117,50 @@ func (c *websocketConn) SetReadDeadline(t time.Time) error {
 // SetWriteDeadline 设置写超时
 func (c *websocketConn) SetWriteDeadline(t time.Time) error {
 	return c.ws.SetWriteDeadline(t)
+}
+
+func parseForwardedIP(value string) net.IP {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	if strings.HasPrefix(strings.ToLower(value), "for=") {
+		value = strings.TrimSpace(value[4:])
+		if separator := strings.IndexByte(value, ';'); separator >= 0 {
+			value = value[:separator]
+		}
+	}
+	value = strings.Trim(value, "\"")
+	if host, _, err := net.SplitHostPort(value); err == nil {
+		value = host
+	}
+	value = strings.Trim(value, "[]")
+	return net.ParseIP(value)
+}
+
+// requestClientIP preserves the endpoint address when the WebSocket is
+// terminated by a reverse proxy. This is telemetry only; it is never used for
+// authentication or authorization.
+func requestClientIP(request *http.Request) net.IP {
+	for _, header := range []string{"CF-Connecting-IP", "True-Client-IP", "X-Real-IP", "X-Forwarded-For", "Forwarded"} {
+		for _, value := range strings.Split(request.Header.Get(header), ",") {
+			if ip := parseForwardedIP(value); ip != nil {
+				return ip
+			}
+		}
+	}
+	if ip := parseForwardedIP(request.RemoteAddr); ip != nil {
+		return ip
+	}
+	return nil
+}
+
+func requestRemoteAddr(request *http.Request) net.Addr {
+	ip := requestClientIP(request)
+	if ip == nil {
+		return nil
+	}
+	return &net.TCPAddr{IP: ip}
 }
 
 // ---------------------------------------
@@ -220,7 +269,7 @@ func GinWSHandler(listener *WSListener, upgrader *websocket.Upgrader) gin.Handle
 			c.String(http.StatusInternalServerError, "ws upgrade error: %v", err)
 			return
 		}
-		conn := &websocketConn{ws: ws}
+		conn := &websocketConn{ws: ws, remoteAddr: requestRemoteAddr(c.Request)}
 		// 非阻塞方式将连接推送到 listener
 		select {
 		case listener.connCh <- conn:

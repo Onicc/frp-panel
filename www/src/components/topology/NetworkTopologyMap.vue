@@ -133,7 +133,7 @@ const mapId = `frp-topology-${Math.random().toString(36).slice(2)}`
 
 const mapStyle = computed(() => theme.resolved.value === 'dark'
   ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
-  : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json')
+  : 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json')
 const mapKey = computed(() => `${theme.resolved.value}-${mapStyle.value}`)
 const mapOptions = computed(() => ({
   container: mapId,
@@ -161,9 +161,6 @@ const selectedNode = computed(() => props.nodes.find((node) => node.id === selec
 watch(() => props.nodes.map((node) => node.locationIp || '').filter(Boolean).join('|'), (value) => {
   void geo.lookupMany(value ? value.split('|') : [])
 }, { immediate: true })
-watch(() => locatedNodes.value.map((node) => `${node.position[0]},${node.position[1]}`).join('|'), () => {
-  if (map.value && !hasFitted.value) fitMap()
-})
 watch(() => theme.resolved.value, () => { hasFitted.value = false })
 
 function assignMarkerRef(setRef: (element: Element | HTMLElement | null) => void, value: unknown) {
@@ -222,7 +219,6 @@ watch(connectionGeoJSON, syncConnections, { deep: true })
 function onMapLoaded(value: unknown) {
   map.value = value as MapLibreMap
   syncConnections()
-  if (!hasFitted.value) fitMap()
 }
 function onMapMove(event: { target?: MapLibreMap }) {
   const target = event?.target

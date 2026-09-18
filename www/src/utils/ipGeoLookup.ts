@@ -2,7 +2,7 @@ import { ref, type Ref } from 'vue'
 
 const cacheKey = 'frp-panel:ip-geo-cache:v1'
 const cacheTtl = 24 * 60 * 60 * 1000
-const requestBatchSize = 50
+const requestBatchSize = 8
 
 export type IpGeoStatus = 'loading' | 'success' | 'error' | 'private'
 
@@ -33,6 +33,18 @@ type GeoJSRecord = {
   timezone?: string
   latitude?: string | number
   longitude?: string | number
+}
+
+type IpWhoRecord = {
+  success?: boolean
+  country_code?: string
+  country?: string
+  region?: string
+  city?: string
+  latitude?: string | number
+  longitude?: string | number
+  connection?: { org?: string; isp?: string }
+  timezone?: { id?: string }
 }
 
 function readCache(): Record<string, IpGeoEntry> {
@@ -79,9 +91,16 @@ export function isPrivateOrLocalIp(value: string): boolean {
     ip.startsWith('ff')
 }
 
-function normalizeRecord(record: GeoJSRecord): IpGeoDetail {
-  const latitude = Number(record.latitude)
-  const longitude = Number(record.longitude)
+function coordinate(value: string | number | undefined, limit: number): number | undefined {
+  if (value === undefined || value === null) return undefined
+  if (typeof value === 'string' && ['nil', 'null', 'nan', 'n/a', 'na', ''].includes(value.trim().toLowerCase())) return undefined
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) && Math.abs(parsed) <= limit ? parsed : undefined
+}
+
+function normalizeGeoJSRecord(record: GeoJSRecord): IpGeoDetail {
+  const latitude = coordinate(record.latitude, 90)
+  const longitude = coordinate(record.longitude, 180)
   return {
     countryCode: record.country_code,
     country: record.country,
@@ -89,26 +108,53 @@ function normalizeRecord(record: GeoJSRecord): IpGeoDetail {
     city: record.city,
     organization: record.organization,
     timezone: record.timezone,
-    latitude: Number.isFinite(latitude) ? latitude : undefined,
-    longitude: Number.isFinite(longitude) ? longitude : undefined,
+    latitude,
+    longitude,
   }
 }
 
-async function lookupIp(ip: string): Promise<IpGeoEntry> {
-  try {
-    const response = await fetch(`https://get.geojs.io/v1/ip/geo/${encodeURIComponent(ip)}.json`, {
-      headers: { Accept: 'application/json' },
-    })
-    if (!response.ok) throw new Error(`GeoJS returned ${response.status}`)
-    const payload = await response.json() as GeoJSRecord
-    const detail = normalizeRecord(payload)
-    if (detail.latitude === undefined || detail.longitude === undefined) {
-      return { status: 'error', fetchedAt: Date.now(), error: 'missing coordinates' }
-    }
-    return { status: 'success', detail, fetchedAt: Date.now() }
-  } catch (error) {
-    return { status: 'error', fetchedAt: Date.now(), error: error instanceof Error ? error.message : String(error) }
+function normalizeIpWhoRecord(record: IpWhoRecord): IpGeoDetail {
+  return {
+    countryCode: record.country_code,
+    country: record.country,
+    region: record.region,
+    city: record.city,
+    organization: record.connection?.org || record.connection?.isp,
+    timezone: record.timezone?.id,
+    latitude: coordinate(record.latitude, 90),
+    longitude: coordinate(record.longitude, 180),
   }
+}
+
+function hasCoordinates(detail: IpGeoDetail) {
+  return detail.latitude !== undefined && detail.longitude !== undefined
+}
+
+async function getJSON<T>(url: string): Promise<T> {
+  const response = await fetch(url, { headers: { Accept: 'application/json' } })
+  if (!response.ok) throw new Error(`Geolocation service returned ${response.status}`)
+  return await response.json() as T
+}
+
+async function lookupIp(ip: string): Promise<IpGeoEntry> {
+  const errors: string[] = []
+  try {
+    const detail = normalizeGeoJSRecord(await getJSON<GeoJSRecord>(`https://get.geojs.io/v1/ip/geo/${encodeURIComponent(ip)}.json`))
+    if (hasCoordinates(detail)) return { status: 'success', detail, fetchedAt: Date.now() }
+    errors.push('GeoJS returned no coordinates')
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error))
+  }
+  try {
+    const payload = await getJSON<IpWhoRecord>(`https://ipwho.is/${encodeURIComponent(ip)}`)
+    if (payload.success === false) throw new Error('ipwho.is could not locate the address')
+    const detail = normalizeIpWhoRecord(payload)
+    if (hasCoordinates(detail)) return { status: 'success', detail, fetchedAt: Date.now() }
+    errors.push('ipwho.is returned no coordinates')
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error))
+  }
+  return { status: 'error', fetchedAt: Date.now(), error: errors.join('; ') || 'missing coordinates' }
 }
 
 export function createIpGeoLookup() {
