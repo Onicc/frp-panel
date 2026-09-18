@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -59,6 +61,32 @@ type serverResource struct {
 	LastSeenAt         *time.Time `json:"lastSeenAt,omitempty"`
 	EnrolledAt         *time.Time `json:"enrolledAt,omitempty"`
 	TunnelCount        int64      `json:"tunnelCount"`
+}
+
+type topologyNode struct {
+	ID                 string     `json:"id"`
+	Kind               string     `json:"kind"`
+	Label              string     `json:"label"`
+	Comment            string     `json:"comment,omitempty"`
+	Address            string     `json:"address,omitempty"`
+	Status             string     `json:"status"`
+	ConfigurationState string     `json:"configurationState"`
+	Enabled            bool       `json:"enabled"`
+	LocationIP         string     `json:"locationIp,omitempty"`
+	LastSeenAt         *time.Time `json:"lastSeenAt,omitempty"`
+	TunnelCount        int64      `json:"tunnelCount"`
+}
+
+type topologyLink struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	SourceClientID string `json:"sourceClientId"`
+	TargetServerID string `json:"targetServerId"`
+	Type           string `json:"type"`
+	RemotePort     int    `json:"remotePort"`
+	Enabled        bool   `json:"enabled"`
+	Status         string `json:"status"`
+	LastError      string `json:"lastError,omitempty"`
 }
 
 type tunnelResource struct {
@@ -1202,6 +1230,96 @@ func overview(appInstance app.Application) gin.HandlerFunc {
 		db.Model(&models.Server{}).Where("user_id = ? AND tenant_id = ?", user.GetUserID(), user.GetTenantID()).Count(&servers)
 		db.Model(&models.ProxyConfig{}).Where("user_id = ? AND tenant_id = ? AND managed_by = ?", user.GetUserID(), user.GetTenantID(), "tunnel").Count(&tunnels)
 		c.JSON(200, gin.H{"clients": clients, "servers": servers, "tunnels": tunnels})
+	}
+}
+
+func publicLocationIP(value string) string {
+	ip := net.ParseIP(strings.Trim(strings.TrimSpace(value), "[]"))
+	if ip == nil || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() || ip.IsMulticast() {
+		return ""
+	}
+	return ip.String()
+}
+
+func topology(appInstance app.Application) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, ok := currentUser(c)
+		if !ok {
+			AbortProblem(c, 401, "Unauthorized", "a valid user session is required")
+			return
+		}
+		db := appInstance.GetDBManager().GetDefaultDB()
+		var clients []models.Client
+		if err := db.Where("user_id = ? AND tenant_id = ? AND (origin_client_id IS NULL OR origin_client_id = ?)", user.GetUserID(), user.GetTenantID(), "").Order("created_at DESC").Find(&clients).Error; err != nil {
+			AbortProblem(c, 500, "Topology unavailable", "could not list Clients")
+			return
+		}
+		var servers []models.Server
+		if err := db.Where("user_id = ? AND tenant_id = ?", user.GetUserID(), user.GetTenantID()).Order("created_at DESC").Find(&servers).Error; err != nil {
+			AbortProblem(c, 500, "Topology unavailable", "could not list Servers")
+			return
+		}
+		var tunnels []models.ProxyConfig
+		if err := db.Where("user_id = ? AND tenant_id = ? AND managed_by = ?", user.GetUserID(), user.GetTenantID(), "tunnel").Order("updated_at DESC").Find(&tunnels).Error; err != nil {
+			AbortProblem(c, 500, "Topology unavailable", "could not list Tunnels")
+			return
+		}
+
+		nodes := make([]topologyNode, 0, len(clients)+len(servers))
+		clientIDs := make(map[string]struct{}, len(clients))
+		serverIDs := make(map[string]struct{}, len(servers))
+		for i := range clients {
+			item := &clients[i]
+			resource := clientToResource(appInstance, db, item)
+			clientIDs[item.ClientID] = struct{}{}
+			nodes = append(nodes, topologyNode{
+				ID: item.ClientID, Kind: "client", Label: item.ClientID, Comment: item.Comment,
+				Status: resource.Status, ConfigurationState: resource.ConfigurationState,
+				Enabled: resource.Enabled, LocationIP: publicLocationIP(item.LastSeenIP),
+				LastSeenAt: item.LastSeenAt, TunnelCount: resource.TunnelCount,
+			})
+		}
+		for i := range servers {
+			item := &servers[i]
+			resource := serverToResource(appInstance, db, item)
+			serverIDs[item.ServerID] = struct{}{}
+			locationIP := publicLocationIP(item.LastSeenIP)
+			if locationIP == "" {
+				locationIP = publicLocationIP(item.ServerIP)
+			}
+			nodes = append(nodes, topologyNode{
+				ID: item.ServerID, Kind: "server", Label: item.ServerID, Comment: item.Comment,
+				Address: item.ServerIP, Status: resource.Status, ConfigurationState: resource.ConfigurationState,
+				Enabled: true, LocationIP: locationIP, LastSeenAt: item.LastSeenAt, TunnelCount: resource.TunnelCount,
+			})
+		}
+
+		links := make([]topologyLink, 0, len(tunnels))
+		for i := range tunnels {
+			item := &tunnels[i]
+			if _, ok := clientIDs[item.OriginClientID]; !ok {
+				continue
+			}
+			if _, ok := serverIDs[item.ServerID]; !ok {
+				continue
+			}
+			resource := tunnelToResource(appInstance, item)
+			links = append(links, topologyLink{
+				ID: resource.ID, Name: resource.Name, SourceClientID: resource.ClientID,
+				TargetServerID: resource.ServerID, Type: resource.Type, RemotePort: resource.RemotePort,
+				Enabled: resource.Enabled, Status: resource.Status, LastError: resource.LastError,
+			})
+		}
+		located := 0
+		for _, node := range nodes {
+			if node.LocationIP != "" {
+				located++
+			}
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"nodes": nodes, "links": links, "locatedCount": located,
+			"totalCount": len(nodes), "generatedAt": time.Now().UTC(),
+		})
 	}
 }
 

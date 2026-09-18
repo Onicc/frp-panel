@@ -177,6 +177,20 @@ var migrations = []migration{
 			return tx.Model(&Server{}).Where("server_api_port = 0").Update("server_api_port", defs.DefaultServerAPIPort).Error
 		},
 	},
+	{
+		version: 5,
+		name:    "endpoint_last_seen_ip",
+		up: func(tx *gorm.DB) error {
+			for _, model := range []any{&Client{}, &Server{}} {
+				if !tx.Migrator().HasColumn(model, "LastSeenIP") {
+					if err := tx.Migrator().AddColumn(model, "LastSeenIP"); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		},
+	},
 }
 
 func runMigrations(db *gorm.DB) error {

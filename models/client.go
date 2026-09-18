@@ -37,6 +37,7 @@ type ClientEntity struct {
 	EnrolledAt *time.Time `json:"enrolled_at" gorm:"index"`
 
 	LastSeenAt *time.Time `json:"last_seen_at" gorm:"index"`
+	LastSeenIP string     `json:"last_seen_ip"`
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 	DeletedAt  gorm.DeletedAt `gorm:"index"`

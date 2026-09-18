@@ -51,51 +51,7 @@
     <div class="panel topology-panel">
       <h2>{{ t('overview.topologyTitle') }}</h2>
 
-      <svg
-        v-if="data.clients > 0 || data.servers > 0"
-        class="topology-svg" viewBox="0 0 600 200" aria-label="Network topology diagram"
-      >
-        <!-- Master node -->
-        <g transform="translate(300,30)">
-          <circle r="14" fill="var(--accent-lo)" stroke="var(--accent)" stroke-width="1.5" />
-          <text y="28" text-anchor="middle" font-size="10" fill="var(--text-muted)" font-family="var(--font-sans)">Master</text>
-        </g>
-
-        <!-- Server nodes -->
-        <g
-          v-for="(srv, i) in topoServers" :key="srv.id"
-          :transform="`translate(${serverX(i, topoServers.length)},100)`"
-        >
-          <line
-            :x1="0" :y1="-14" :x2="300 - serverX(i, topoServers.length)" :y2="-72"
-            stroke="var(--border)" stroke-width="1"
-          />
-          <circle r="10" fill="var(--ok-lo)" :stroke="srv.status === 'online' ? 'var(--ok)' : 'var(--border)'" stroke-width="1.5" />
-          <text y="22" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="var(--font-sans)">{{ shortId(srv.id) }}</text>
-        </g>
-
-        <!-- Client nodes -->
-        <g
-          v-for="(cli, i) in topoClients" :key="cli.id"
-          :transform="`translate(${clientX(i, topoClients.length)},170)`"
-        >
-          <circle r="8" fill="var(--info-lo)" :stroke="cli.status === 'online' ? 'var(--info)' : 'var(--border)'" stroke-width="1.5" />
-          <text y="20" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-family="var(--font-sans)">{{ shortId(cli.id) }}</text>
-        </g>
-
-        <!-- Empty call-to-action -->
-        <text
-          v-if="data.clients === 0 && data.servers === 0"
-          x="300" y="110" text-anchor="middle" font-size="13"
-          fill="var(--text-muted)" font-family="var(--font-sans)"
-        >
-          {{ t('overview.topologyEmpty') }}
-        </text>
-      </svg>
-
-      <div v-if="data.clients === 0 && data.servers === 0" style="padding:32px 0 8px;text-align:center;color:var(--text-muted);font-size:var(--text-sm);">
-        {{ t('overview.topologyEmpty') }}
-      </div>
+      <NetworkTopologyMap :nodes="topology.nodes" :links="topology.links" />
 
       <!-- Getting-started flow -->
       <div class="next-flow">
@@ -118,7 +74,8 @@ import { useI18n } from 'vue-i18n'
 import Icon from '../components/icons/Icon.vue'
 import { api } from '../api'
 import { useToastStore } from '../stores/toast'
-import type { Client, Server } from '../api'
+import type { TopologyLink, TopologyNode } from '../api'
+import NetworkTopologyMap from '../components/topology/NetworkTopologyMap.vue'
 import { useAutoRefresh } from '../composables/useAutoRefresh'
 
 const { t } = useI18n()
@@ -132,18 +89,7 @@ const data = reactive({
   serverBreakdown: [] as { status: string; count: number }[],
   tunnelBreakdown: [] as { status: string; count: number }[],
 })
-const topoClients = reactive<Client[]>([])
-const topoServers = reactive<Server[]>([])
-
-const shortId = (id: string) => id.split('.').pop()?.slice(0, 8) || id.slice(0, 8)
-
-const serverX = (i: number, total: number) => {
-  if (total === 0) return 300
-  const step = Math.min(500, total * 80)
-  const start = 300 - step / 2
-  return start + (i / Math.max(total - 1, 1)) * step
-}
-const clientX = (i: number, total: number) => serverX(i, total)
+const topology = reactive({ nodes: [] as TopologyNode[], links: [] as TopologyLink[] })
 
 const breakdown = (items: { status: string }[]) => {
   const map = new Map<string, number>()
@@ -156,10 +102,12 @@ const breakdown = (items: { status: string }[]) => {
 
 const loadData = async () => {
   try {
-    const [overview, clientPage, serverPage] = await Promise.all([
+    const [overview, clientPage, serverPage, topologyResult, tunnelPage] = await Promise.all([
       api.overview(),
-      api.clients({ pageSize: 12 }),
-      api.servers({ pageSize: 8 }),
+      api.clients({ pageSize: 100 }),
+      api.servers({ pageSize: 100 }),
+      api.topology(),
+      api.tunnels({ pageSize: 100 }),
     ])
     Object.assign(data, {
       clients: overview.clients,
@@ -167,10 +115,10 @@ const loadData = async () => {
       tunnels: overview.tunnels,
       clientBreakdown: breakdown(clientPage.items),
       serverBreakdown: breakdown(serverPage.items),
-      tunnelBreakdown: [],
+      tunnelBreakdown: breakdown(tunnelPage.items),
     })
-    topoClients.splice(0, topoClients.length, ...clientPage.items.slice(0, 8))
-    topoServers.splice(0, topoServers.length, ...serverPage.items.slice(0, 5))
+    topology.nodes.splice(0, topology.nodes.length, ...topologyResult.nodes)
+    topology.links.splice(0, topology.links.length, ...topologyResult.links)
   } catch {
     toast.show(t('common.error'), 'error')
   }

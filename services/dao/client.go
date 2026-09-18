@@ -33,6 +33,7 @@ type ClientMutation interface {
 	DeleteClient(userInfo models.UserInfo, clientID string) error
 	UpdateClient(userInfo models.UserInfo, client *models.ClientEntity) error
 	AdminUpdateClientLastSeen(clientID string) error
+	AdminUpdateClientPresence(clientID, ip string) error
 }
 
 type clientQuery struct{ *queryImpl }
@@ -380,11 +381,18 @@ func (q *clientQuery) AdminGetClientIDsInShadowByClientID(clientID string) ([]st
 }
 
 func (m *clientMutation) AdminUpdateClientLastSeen(clientID string) error {
+	return m.AdminUpdateClientPresence(clientID, "")
+}
+
+// AdminUpdateClientPresence records liveness and the peer address reported by
+// the authenticated gRPC transport without requiring a browser user context.
+func (m *clientMutation) AdminUpdateClientPresence(clientID, ip string) error {
 	db := m.ctx.GetApp().GetDBManager().GetDefaultDB()
-	return db.Model(&models.Client{
-		ClientEntity: &models.ClientEntity{
-			ClientID: clientID,
-		}}).Update("last_seen_at", time.Now()).Error
+	updates := map[string]any{"last_seen_at": time.Now().UTC()}
+	if ip != "" {
+		updates["last_seen_ip"] = ip
+	}
+	return db.Model(&models.Client{}).Where("client_id = ?", clientID).Updates(updates).Error
 }
 
 func normalClientFilter(db *gorm.DB) *gorm.DB {

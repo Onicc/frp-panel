@@ -26,18 +26,28 @@ type ServerMutation interface {
 	DeleteServer(userInfo models.UserInfo, serverID string) error
 	UpdateServer(userInfo models.UserInfo, server *models.ServerEntity) error
 	AdminUpdateServerLastSeen(serverID string) error
+	AdminUpdateServerPresence(serverID, ip string) error
 }
 
 // AdminUpdateServerLastSeen records liveness reported by the server transport
 // without requiring a browser user context.
 func (m *serverMutation) AdminUpdateServerLastSeen(serverID string) error {
+	return m.AdminUpdateServerPresence(serverID, "")
+}
+
+// AdminUpdateServerPresence records liveness and the peer address reported by
+// the authenticated gRPC transport without requiring a browser user context.
+func (m *serverMutation) AdminUpdateServerPresence(serverID, ip string) error {
 	if serverID == "" {
 		return fmt.Errorf("invalid server id")
 	}
 	now := time.Now().UTC()
 	db := m.ctx.GetApp().GetDBManager().GetDefaultDB()
-	return db.Model(&models.Server{}).Where("server_id = ?", serverID).
-		Updates(map[string]any{"last_seen_at": now}).Error
+	updates := map[string]any{"last_seen_at": now}
+	if ip != "" {
+		updates["last_seen_ip"] = ip
+	}
+	return db.Model(&models.Server{}).Where("server_id = ?", serverID).Updates(updates).Error
 }
 
 type serverQuery struct{ *queryImpl }

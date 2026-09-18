@@ -49,6 +49,7 @@ func resourceRouter(a app.Application, user *models.UserEntity) *gin.Engine {
 	r.PATCH("/clients/:id", patchClient(a))
 	r.DELETE("/clients/:id", deleteClient(a))
 	r.POST("/clients/:id/enrollment", rotateClientEnrollment(a))
+	r.GET("/topology", topology(a))
 	r.POST("/servers", createServer(a))
 	r.PATCH("/servers/:id", patchServer(a))
 	r.DELETE("/servers/:id", deleteServer(a))
@@ -153,6 +154,59 @@ func TestServerAPIPortIsConfigurableAndCannotMatchBindPort(t *testing.T) {
 	}
 	if payload.Server.ServerAPIPort != 8998 || strings.Contains(payload.Enrollment.ComposeYAML, "\t") || !strings.Contains(payload.Enrollment.ComposeYAML, "SERVER_API_PORT: \"8998\"") {
 		t.Fatalf("server API port was not propagated: %#v", payload)
+	}
+}
+
+func TestTopologyIncludesTunnelEdgesAndPublicEndpointLocations(t *testing.T) {
+	a, user := resourceTestApp(t)
+	r := resourceRouter(a, user)
+	post := func(path, body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(rec, req)
+		return rec
+	}
+	if rec := post("/clients", `{"clientId":"mac"}`); rec.Code != http.StatusCreated {
+		t.Fatalf("create client = %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := post("/servers", `{"serverId":"edge","address":"edge.example.test","bindPort":7100}`); rec.Code != http.StatusCreated {
+		t.Fatalf("create server = %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := post("/tunnels", `{"name":"ssh","clientId":"mac","serverId":"edge","type":"tcp","localPort":22,"remotePort":6022}`); rec.Code != http.StatusCreated {
+		t.Fatalf("create tunnel = %d %s", rec.Code, rec.Body.String())
+	}
+	db := a.GetDBManager().GetDefaultDB()
+	if err := db.Model(&models.Client{}).Where("client_id = ?", "owner.c.mac").Update("last_seen_ip", "8.8.8.8").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&models.Server{}).Where("server_id = ?", "owner.s.edge").Update("last_seen_ip", "1.1.1.1").Error; err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/topology", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("topology = %d %s", rec.Code, rec.Body.String())
+	}
+	var payload struct {
+		Nodes []topologyNode `json:"nodes"`
+		Links []topologyLink `json:"links"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Nodes) != 2 || len(payload.Links) != 1 {
+		t.Fatalf("topology shape = %#v", payload)
+	}
+	locations := map[string]string{}
+	for _, node := range payload.Nodes {
+		locations[node.ID] = node.LocationIP
+	}
+	if locations["owner.c.mac"] != "8.8.8.8" || locations["owner.s.edge"] != "1.1.1.1" {
+		t.Fatalf("topology locations = %#v", locations)
+	}
+	if payload.Links[0].SourceClientID != "owner.c.mac" || payload.Links[0].TargetServerID != "owner.s.edge" {
+		t.Fatalf("topology edge = %#v", payload.Links[0])
 	}
 }
 

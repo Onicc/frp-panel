@@ -2,6 +2,9 @@ export type Account = { username:string; email:string; role:string }
 export type Client = { id:string; comment:string; configurationState:'configured'|'unconfigured'; status:'pending'|'online'|'offline'|'error'|'disabled'; enabled:boolean; lastSeenAt?:string; enrolledAt?:string; tunnelCount:number }
 export type Server = { id:string; address:string; bindPort:number; serverApiPort:number; comment:string; configurationState:'configured'|'unconfigured'; status:'pending'|'online'|'offline'|'error'|'disabled'; lastSeenAt?:string; enrolledAt?:string; tunnelCount:number }
 export type Tunnel = { id:string; name:string; clientId:string; serverId:string; type:'tcp'|'udp'; localHost:string; localPort:number; remotePort:number; enabled:boolean; status:string; lastError?:string; updatedAt:string }
+export type TopologyNode = { id:string; kind:'client'|'server'; label:string; comment?:string; address?:string; status:string; configurationState:string; enabled:boolean; locationIp?:string; lastSeenAt?:string; tunnelCount:number }
+export type TopologyLink = { id:string; name:string; sourceClientId:string; targetServerId:string; type:'tcp'|'udp'; remotePort:number; enabled:boolean; status:string; lastError?:string }
+export type TopologyResponse = { nodes:TopologyNode[]; links:TopologyLink[]; locatedCount:number; totalCount:number; generatedAt:string }
 export type Page<T> = { items:T[]; total:number; page:number; pageSize:number }
 export type Enrollment = { clientId?:string; serverId?:string; token:string; expiresAt:string; apiUrl:string; rpcUrl:string; installCommand?:string; installCommands?:Record<'linux'|'darwin'|'windows',string>; composeYaml?:string }
 export class APIError extends Error { constructor(message:string, readonly status:number, readonly problem?:any){super(message);this.name='APIError'} }
@@ -21,6 +24,7 @@ export const api={
   account:async()=>{const response=await request<{user?:Account;username?:string;email?:string;role?:string}>('/api/v2/account');return response.user||{username:response.username||'',email:response.email||'',role:response.role||''}},
   changePassword:(currentPassword:string,newPassword:string)=>request<{reauthenticate:boolean}>('/api/v2/account/password',{method:'POST',body:JSON.stringify({currentPassword,newPassword})}),
   overview:()=>request<{clients:number;servers:number;tunnels:number}>('/api/v2/overview'),
+  topology:()=>request<TopologyResponse>('/api/v2/topology'),
   clients:(params:Record<string,string|number|undefined>={})=>request<Page<Client>>(`/api/v2/clients${query(params)}`),
   createClient:(body:{clientId:string;comment?:string})=>request<{client:Client;enrollment:Enrollment}>('/api/v2/clients',{method:'POST',body:JSON.stringify(body)}),
   updateClient:(id:string,body:Record<string,unknown>)=>request<{client:Client}>(`/api/v2/clients/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(body)}),

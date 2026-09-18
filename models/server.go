@@ -25,6 +25,7 @@ type ServerEntity struct {
 	FrpsUrls      GormArray[string] `json:"frps_urls"`
 	EnrolledAt    *time.Time        `json:"enrolled_at" gorm:"index"`
 	LastSeenAt    *time.Time        `json:"last_seen_at" gorm:"index"`
+	LastSeenIP    string            `json:"last_seen_ip"`
 	BindPort      int               `json:"bind_port"`
 	ServerAPIPort int               `json:"server_api_port" gorm:"not null;default:8999"`
 	CreatedAt     time.Time

@@ -40,6 +40,7 @@ func Configure(router *gin.RouterGroup, appInstance app.Application) {
 	protected.POST("/auth/logout", logout(appInstance))
 	protected.POST("/account/password", changePassword(appInstance))
 	protected.GET("/overview", overview(appInstance))
+	protected.GET("/topology", topology(appInstance))
 	protected.GET("/clients", listClients(appInstance))
 	protected.POST("/clients", createClient(appInstance))
 	protected.GET("/clients/:id", getClient(appInstance))

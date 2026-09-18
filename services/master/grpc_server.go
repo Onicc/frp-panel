@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 
 	"github.com/Onicc/frp-panel/biz/master/client"
 	masterserver "github.com/Onicc/frp-panel/biz/master/server"
@@ -22,6 +23,7 @@ import (
 	"github.com/Onicc/frp-panel/utils/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
 )
 
 type server struct {
@@ -144,7 +146,7 @@ func (s *server) FRPCAuth(ctx context.Context, req *pb.FRPAuthRequest) (*pb.FRPA
 
 // ServerSend implements pb.MasterServer.
 func (s *server) ServerSend(sender pb.Master_ServerSendServer) error {
-	ctx := app.NewContext(context.Background(), s.appInstance)
+	ctx := app.NewContext(sender.Context(), s.appInstance)
 
 	logger.Logger(ctx).Infof("server get a client connected")
 	var done chan bool
@@ -213,12 +215,13 @@ func (s *server) ServerSend(sender pb.Master_ServerSendServer) error {
 				return fmt.Errorf("invalid secret, %s id: [%s]", req.GetEvent().String(), req.GetClientId())
 			}
 
+			remoteIP := connectorRemoteIP(sender.Context())
 			if cliType == defs.CliTypeClient {
-				if err := dao.NewMutation(ctx).AdminUpdateClientLastSeen(req.GetClientId()); err != nil {
+				if err := dao.NewMutation(ctx).AdminUpdateClientPresence(req.GetClientId(), remoteIP); err != nil {
 					logger.Logger(ctx).Errorf("cannot update client last seen, %s id: [%s]", req.GetEvent().String(), req.GetClientId())
 				}
 			} else if cliType == defs.CliTypeServer {
-				if err := dao.NewMutation(ctx).AdminUpdateServerLastSeen(req.GetClientId()); err != nil {
+				if err := dao.NewMutation(ctx).AdminUpdateServerPresence(req.GetClientId(), remoteIP); err != nil {
 					logger.Logger(ctx).Errorf("cannot update server last seen, %s id: [%s]", req.GetEvent().String(), req.GetClientId())
 				}
 			}
@@ -236,6 +239,18 @@ func (s *server) ServerSend(sender pb.Master_ServerSendServer) error {
 	}
 	<-done
 	return nil
+}
+
+func connectorRemoteIP(ctx context.Context) string {
+	p, ok := peer.FromContext(ctx)
+	if !ok || p == nil || p.Addr == nil {
+		return ""
+	}
+	address := strings.TrimSpace(p.Addr.String())
+	if host, _, err := net.SplitHostPort(address); err == nil {
+		return strings.Trim(host, "[]")
+	}
+	return strings.Trim(address, "[]")
 }
 
 // PushProxyInfo implements pb.MasterServer.

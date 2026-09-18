@@ -41,7 +41,7 @@
             <th>{{ t('servers.id') }}</th>
             <th>{{ t('servers.address') }}</th>
             <th class="num">{{ t('servers.bindPort') }}</th>
-            <th class="num">{{ t('servers.serverApiPort') }}</th>
+            <th class="num">{{ t('servers.serverPort') }}</th>
             <th>{{ t('servers.state') }}</th>
             <th>{{ t('servers.status') }}</th>
             <th class="num">{{ t('servers.tunnels') }}</th>
@@ -91,8 +91,7 @@
           <Input v-model.number="form.bindPort" :label="t('servers.bindPort')" type="number" min="1024" max="65535" required />
           <Input
             v-model.number="form.serverApiPort"
-            :label="t('servers.serverApiPort')"
-            :hint="t('servers.portHint')"
+            :label="t('servers.serverPort')"
             :error="portConflict ? t('servers.portConflict') : undefined"
             type="number"
             min="1024"
@@ -101,6 +100,7 @@
           />
         </div>
         <Input v-model="form.comment" :label="t('servers.comment')" />
+        <p class="field-hint server-port-hint"><Icon name="infoCircle" size="xs" />{{ t('servers.portHint') }}</p>
         <p v-if="modalError" class="error" role="alert">{{ modalError }}</p>
       </form>
       <template #footer>
