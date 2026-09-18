@@ -8,6 +8,15 @@ importers:
 
   .:
     dependencies:
+      '@deck.gl/core':
+        specifier: ^9.4.0
+        version: 9.4.0(@luma.gl/webgpu@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1)))
+      '@deck.gl/layers':
+        specifier: ^9.4.0
+        version: 9.4.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1))))(@loaders.gl/core@4.5.1)(@luma.gl/core@9.4.1)(@luma.gl/engine@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1)))
+      '@deck.gl/mapbox':
+        specifier: ^9.4.0
+        version: 9.4.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1))))(@luma.gl/core@9.4.1)(@math.gl/web-mercator@4.1.0)
       '@geoql/v-maplibre':
         specifier: ^3.0.0
         version: 3.0.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1))))(@deck.gl/layers@9.4.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1))))(@loaders.gl/core@4.5.1)(@luma.gl/core@9.4.1)(@luma.gl/engine@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1))))(@deck.gl/mapbox@9.4.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1))))(@luma.gl/core@9.4.1)(@math.gl/web-mercator@4.1.0))(vue@3.5.42(typescript@6.0.3))
@@ -1908,7 +1917,6 @@ snapshots:
       mjolnir.js: 3.1.1
     transitivePeerDependencies:
       - '@luma.gl/webgpu'
-    optional: true
 
   '@deck.gl/layers@9.4.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1))))(@loaders.gl/core@4.5.1)(@luma.gl/core@9.4.1)(@luma.gl/engine@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1)))':
     dependencies:
@@ -1925,14 +1933,12 @@ snapshots:
       '@math.gl/web-mercator': 4.1.0
       '@types/geojson': 7946.0.16
       earcut: 2.2.4
-    optional: true
 
   '@deck.gl/mapbox@9.4.0(@deck.gl/core@9.4.0(@luma.gl/webgpu@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1))))(@luma.gl/core@9.4.1)(@math.gl/web-mercator@4.1.0)':
     dependencies:
       '@deck.gl/core': 9.4.0(@luma.gl/webgpu@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1)))
       '@luma.gl/core': 9.4.1
       '@math.gl/web-mercator': 4.1.0
-    optional: true
 
   '@eslint-community/eslint-utils@4.10.1(eslint@10.0.3(jiti@1.21.7))':
     dependencies:
@@ -2031,13 +2037,11 @@ snapshots:
       '@loaders.gl/schema-utils': 4.5.1(@loaders.gl/core@4.5.1)
       '@loaders.gl/worker-utils': 4.5.1(@loaders.gl/core@4.5.1)
       '@probe.gl/log': 4.1.2
-    optional: true
 
   '@loaders.gl/images@4.5.1(@loaders.gl/core@4.5.1)':
     dependencies:
       '@loaders.gl/core': 4.5.1
       '@loaders.gl/loader-utils': 4.5.1(@loaders.gl/core@4.5.1)
-    optional: true
 
   '@loaders.gl/loader-utils@4.5.1(@loaders.gl/core@4.5.1)':
     dependencies:
@@ -2047,7 +2051,6 @@ snapshots:
       '@probe.gl/stats': 4.1.2
     transitivePeerDependencies:
       - '@loaders.gl/core'
-    optional: true
 
   '@loaders.gl/schema-utils@4.5.1(@loaders.gl/core@4.5.1)':
     dependencies:
@@ -2056,18 +2059,15 @@ snapshots:
       '@math.gl/types': 4.1.0
       '@types/geojson': 7946.0.16
       apache-arrow: 21.2.0
-    optional: true
 
   '@loaders.gl/schema@4.5.1':
     dependencies:
       '@types/geojson': 7946.0.16
       apache-arrow: 21.2.0
-    optional: true
 
   '@loaders.gl/worker-utils@4.5.1(@loaders.gl/core@4.5.1)':
     dependencies:
       '@loaders.gl/core': 4.5.1
-    optional: true
 
   '@luma.gl/core@9.4.1':
     dependencies:
@@ -2076,7 +2076,6 @@ snapshots:
       '@probe.gl/log': 4.1.2
       '@probe.gl/stats': 4.1.2
       '@types/offscreencanvas': 2019.7.3
-    optional: true
 
   '@luma.gl/engine@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1))':
     dependencies:
@@ -2086,7 +2085,6 @@ snapshots:
       '@math.gl/types': 4.1.0
       '@probe.gl/log': 4.1.2
       '@probe.gl/stats': 4.1.2
-    optional: true
 
   '@luma.gl/gpgpu@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/engine@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1)))(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1))(@luma.gl/webgpu@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1)))':
     dependencies:
@@ -2098,21 +2096,18 @@ snapshots:
       '@math.gl/types': 4.1.0
       '@probe.gl/log': 4.1.2
       '@probe.gl/stats': 4.1.2
-    optional: true
 
   '@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1)':
     dependencies:
       '@luma.gl/core': 9.4.1
       '@math.gl/core': 4.1.0
       '@math.gl/types': 4.1.0
-    optional: true
 
   '@luma.gl/webgl@9.4.1(@luma.gl/core@9.4.1)':
     dependencies:
       '@luma.gl/core': 9.4.1
       '@math.gl/types': 4.1.0
       '@probe.gl/env': 4.1.2
-    optional: true
 
   '@luma.gl/webgpu@9.4.1(@luma.gl/core@9.4.1)(@luma.gl/shadertools@9.4.1(@luma.gl/core@9.4.1))':
     dependencies:
@@ -2120,7 +2115,6 @@ snapshots:
       '@luma.gl/shadertools': 9.4.1(@luma.gl/core@9.4.1)
       '@probe.gl/env': 4.1.2
       '@webgpu/types': 0.1.72
-    optional: true
 
   '@mapbox/jsonlint-lines-primitives@2.0.3': {}
 
@@ -2162,23 +2156,18 @@ snapshots:
   '@math.gl/core@4.1.0':
     dependencies:
       '@math.gl/types': 4.1.0
-    optional: true
 
   '@math.gl/polygon@4.1.0':
     dependencies:
       '@math.gl/core': 4.1.0
-    optional: true
 
-  '@math.gl/sun@4.1.0':
-    optional: true
+  '@math.gl/sun@4.1.0': {}
 
-  '@math.gl/types@4.1.0':
-    optional: true
+  '@math.gl/types@4.1.0': {}
 
   '@math.gl/web-mercator@4.1.0':
     dependencies:
       '@math.gl/core': 4.1.0
-    optional: true
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -2200,16 +2189,13 @@ snapshots:
     dependencies:
       playwright: 1.63.0
 
-  '@probe.gl/env@4.1.2':
-    optional: true
+  '@probe.gl/env@4.1.2': {}
 
   '@probe.gl/log@4.1.2':
     dependencies:
       '@probe.gl/env': 4.1.2
-    optional: true
 
-  '@probe.gl/stats@4.1.2':
-    optional: true
+  '@probe.gl/stats@4.1.2': {}
 
   '@rolldown/binding-android-arm-eabi@1.2.8':
     optional: true
@@ -2280,10 +2266,8 @@ snapshots:
   '@types/node@25.9.7':
     dependencies:
       undici-types: 7.24.6
-    optional: true
 
-  '@types/offscreencanvas@2019.7.3':
-    optional: true
+  '@types/offscreencanvas@2019.7.3': {}
 
   '@typescript-eslint/eslint-plugin@8.70.0(@typescript-eslint/parser@8.70.0(eslint@10.0.3(jiti@1.21.7))(typescript@6.0.3))(eslint@10.0.3(jiti@1.21.7))(typescript@6.0.3)':
     dependencies:
@@ -2480,8 +2464,7 @@ snapshots:
     optionalDependencies:
       '@vue/server-renderer': 3.5.42
 
-  '@webgpu/types@0.1.72':
-    optional: true
+  '@webgpu/types@0.1.72': {}
 
   abbrev@5.0.0: {}
 
@@ -2513,7 +2496,6 @@ snapshots:
       flatbuffers: 25.9.23
       json-with-bigint: 3.5.12
       tslib: 2.8.1
-    optional: true
 
   arg@5.0.2: {}
 
@@ -2623,8 +2605,7 @@ snapshots:
 
   dlv@1.1.3: {}
 
-  earcut@2.2.4:
-    optional: true
+  earcut@2.2.4: {}
 
   earcut@3.2.3: {}
 
@@ -2778,8 +2759,7 @@ snapshots:
       flatted: 3.2.9
       keyv: 4.5.4
 
-  flatbuffers@25.9.23:
-    optional: true
+  flatbuffers@25.9.23: {}
 
   flatted@3.2.9: {}
 
@@ -2892,8 +2872,7 @@ snapshots:
 
   json-stringify-pretty-compact@4.0.0: {}
 
-  json-with-bigint@3.5.12:
-    optional: true
+  json-with-bigint@3.5.12: {}
 
   kdbush@4.1.0: {}
 
@@ -3011,8 +2990,7 @@ snapshots:
 
   minipass@7.1.3: {}
 
-  mjolnir.js@3.1.1:
-    optional: true
+  mjolnir.js@3.1.1: {}
 
   ms@2.1.2: {}
 
@@ -3323,8 +3301,7 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
-  tslib@2.8.1:
-    optional: true
+  tslib@2.8.1: {}
 
   type-check@0.4.0:
     dependencies:
@@ -3345,8 +3322,7 @@ snapshots:
 
   undici-types@7.16.0: {}
 
-  undici-types@7.24.6:
-    optional: true
+  undici-types@7.24.6: {}
 
   undici@8.10.2: {}
 

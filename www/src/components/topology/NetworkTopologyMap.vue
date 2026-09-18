@@ -112,20 +112,34 @@
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { VControlAttribution, VControlNavigation, VControlScale, VMap, VMarker } from '@geoql/v-maplibre'
-import { LngLatBounds, type ExpressionSpecification, type GeoJSONSource, type Map as MapLibreMap } from 'maplibre-gl'
+import { ArcLayer } from '@deck.gl/layers'
+import { MapboxOverlay } from '@deck.gl/mapbox'
+import { LngLatBounds, type Map as MapLibreMap } from 'maplibre-gl'
 import type { TopologyLink, TopologyNode } from '../../api'
 import Icon from '../icons/Icon.vue'
+import { routeParallelArcs } from './arcGeometry'
 import { useTheme } from '../../theme'
 import { createIpGeoLookup, type IpGeoEntry } from '../../utils/ipGeoLookup'
 
 type LocatedNode = TopologyNode & { position: [number, number]; geo?: IpGeoEntry }
-type ArcDatum = { link: TopologyLink; source: [number, number]; target: [number, number] }
+type ArcColor = [number, number, number]
+type ArcDatum = {
+  link: TopologyLink
+  source: [number, number]
+  target: [number, number]
+  sourceId: string
+  targetId: string
+  lane: number
+  routeCount: number
+  height: number
+}
 
 const props = defineProps<{ nodes: TopologyNode[]; links: TopologyLink[] }>()
 const { t, locale } = useI18n()
 const theme = useTheme()
 const geo = createIpGeoLookup()
 const map = shallowRef<MapLibreMap>()
+const deckOverlay = shallowRef<MapboxOverlay>()
 const selectedNodeId = ref('')
 const hasFitted = ref(false)
 const viewState = ref({ center: [0, 18] as [number, number], zoom: 1.15 })
@@ -151,11 +165,12 @@ const locatedNodes = computed<LocatedNode[]>(() => props.nodes.flatMap((node) =>
   return [{ ...node, position: [detail.longitude, detail.latitude], geo: geoEntry(node) }]
 }))
 const positionById = computed(() => new Map(locatedNodes.value.map((node) => [node.id, node.position])))
-const arcData = computed<ArcDatum[]>(() => props.links.flatMap((link) => {
+const arcCandidates = computed(() => props.links.flatMap((link) => {
   const source = positionById.value.get(link.sourceClientId)
   const target = positionById.value.get(link.targetServerId)
-  return source && target ? [{ link, source, target }] : []
+  return source && target ? [{ link, source, target, sourceId: link.sourceClientId, targetId: link.targetServerId }] : []
 }))
+const arcData = computed<ArcDatum[]>(() => routeParallelArcs(arcCandidates.value))
 const selectedNode = computed(() => props.nodes.find((node) => node.id === selectedNodeId.value))
 
 watch(() => props.nodes.map((node) => node.locationIp || '').filter(Boolean).join('|'), (value) => {
@@ -167,58 +182,73 @@ function assignMarkerRef(setRef: (element: Element | HTMLElement | null) => void
   setRef(value instanceof Element ? value : null)
 }
 
-function greatCirclePath(source: [number, number], target: [number, number], segments = 40): [number, number][] {
-  const radians = Math.PI / 180
-  const degrees = 180 / Math.PI
-  const a = [Math.cos(source[1] * radians) * Math.cos(source[0] * radians), Math.cos(source[1] * radians) * Math.sin(source[0] * radians), Math.sin(source[1] * radians)]
-  const b = [Math.cos(target[1] * radians) * Math.cos(target[0] * radians), Math.cos(target[1] * radians) * Math.sin(target[0] * radians), Math.sin(target[1] * radians)]
-  const dot = Math.min(1, Math.max(-1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))
-  const angle = Math.acos(dot)
-  if (angle < 0.0001) return [source, target]
-  const sinAngle = Math.sin(angle)
-  return Array.from({ length: segments + 1 }, (_, index) => {
-    const progress = index / segments
-    const scaleA = Math.sin((1 - progress) * angle) / sinAngle
-    const scaleB = Math.sin(progress * angle) / sinAngle
-    const x = scaleA * a[0] + scaleB * b[0]
-    const y = scaleA * a[1] + scaleB * b[1]
-    const z = scaleA * a[2] + scaleB * b[2]
-    return [Math.atan2(y, x) * degrees, Math.atan2(z, Math.sqrt(x * x + y * y)) * degrees]
-  })
+function arcColors(status: string): { source: ArcColor; target: ArcColor } {
+  if (status === 'error') return { source: [248, 113, 113], target: [220, 38, 38] }
+  if (status === 'pending') return { source: [251, 191, 36], target: [245, 158, 11] }
+  if (status === 'online') return { source: [56, 189, 248], target: [45, 212, 191] }
+  return { source: [148, 163, 184], target: [100, 116, 139] }
 }
 
-const connectionGeoJSON = computed(() => ({
-  type: 'FeatureCollection' as const,
-  features: arcData.value.map((arc) => ({
-    type: 'Feature' as const,
-    geometry: { type: 'LineString' as const, coordinates: greatCirclePath(arc.source, arc.target) },
-    properties: { status: arc.link.status },
-  })),
-}))
+const arcSource = (arc: ArcDatum) => arc.source
+const arcTarget = (arc: ArcDatum) => arc.target
+const arcHeight = (arc: ArcDatum) => arc.height
+const arcWidth = (arc: ArcDatum) => arc.link.status === 'online' ? 2.2 : 1.8
+const arcGlowWidth = (arc: ArcDatum) => arc.link.status === 'online' ? 8 : 6
+const arcSourceColor = (arc: ArcDatum) => arcColors(arc.link.status).source
+const arcTargetColor = (arc: ArcDatum) => arcColors(arc.link.status).target
 
-const connectionSourceId = 'frp-topology-connections'
-const connectionGlowLayerId = 'frp-topology-connections-glow'
-const connectionLayerId = 'frp-topology-connections'
-
-function syncConnections() {
-  if (!map.value) return
-  const data = connectionGeoJSON.value
-  const source = map.value.getSource(connectionSourceId) as GeoJSONSource | undefined
-  if (source) {
-    source.setData(data)
-    return
-  }
-  map.value.addSource(connectionSourceId, { type: 'geojson', data })
-  const colorExpression = ['match', ['get', 'status'], 'online', '#2dd4bf', 'error', '#f87171', 'pending', '#f59e0b', '#94a3b8'] as unknown as ExpressionSpecification
-  map.value.addLayer({ id: connectionGlowLayerId, type: 'line', source: connectionSourceId, paint: { 'line-color': colorExpression, 'line-width': 8, 'line-opacity': 0.18, 'line-blur': 4 } })
-  map.value.addLayer({ id: connectionLayerId, type: 'line', source: connectionSourceId, paint: { 'line-color': colorExpression, 'line-width': 1.8, 'line-opacity': 0.9, 'line-dasharray': [2, 1.5] } })
+function syncDeckLayers() {
+  if (!deckOverlay.value) return
+  const data = arcData.value
+  deckOverlay.value.setProps({ layers: data.length ? [
+    new ArcLayer<ArcDatum>({
+      id: 'frp-topology-arcs-glow',
+      data,
+      getSourcePosition: arcSource,
+      getTargetPosition: arcTarget,
+      getSourceColor: arcSourceColor,
+      getTargetColor: arcTargetColor,
+      getHeight: arcHeight,
+      getWidth: arcGlowWidth,
+      greatCircle: true,
+      numSegments: 50,
+      widthUnits: 'pixels',
+      opacity: 0.18,
+      pickable: false,
+    }),
+    new ArcLayer<ArcDatum>({
+      id: 'frp-topology-arcs',
+      data,
+      getSourcePosition: arcSource,
+      getTargetPosition: arcTarget,
+      getSourceColor: arcSourceColor,
+      getTargetColor: arcTargetColor,
+      getHeight: arcHeight,
+      getWidth: arcWidth,
+      greatCircle: true,
+      numSegments: 50,
+      widthUnits: 'pixels',
+      opacity: 0.92,
+      pickable: false,
+    }),
+  ] : [] })
 }
 
-watch(connectionGeoJSON, syncConnections, { deep: true })
+watch(arcData, syncDeckLayers, { deep: true })
+
+function destroyDeckOverlay() {
+  if (!map.value || !deckOverlay.value) return
+  map.value.removeControl(deckOverlay.value)
+  deckOverlay.value.finalize()
+  deckOverlay.value = undefined
+}
 
 function onMapLoaded(value: unknown) {
+  destroyDeckOverlay()
   map.value = value as MapLibreMap
-  syncConnections()
+  deckOverlay.value = new MapboxOverlay({ interleaved: false, useDevicePixels: 1 })
+  map.value.addControl(deckOverlay.value)
+  syncDeckLayers()
 }
 function onMapMove(event: { target?: MapLibreMap }) {
   const target = event?.target
@@ -256,5 +286,8 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 }
 
-onBeforeUnmount(() => { map.value = undefined })
+onBeforeUnmount(() => {
+  destroyDeckOverlay()
+  map.value = undefined
+})
 </script>

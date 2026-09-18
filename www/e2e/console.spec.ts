@@ -118,20 +118,26 @@ test('overview renders geolocated Client to Server Tunnel topology', async ({ pa
     contentType: 'application/json',
     body: JSON.stringify({
       nodes: [
-        { ...client, kind: 'client', label: client.id, enabled: true, locationIp: '8.8.8.8' },
-        { ...server, kind: 'server', label: server.id, enabled: true, locationIp: '1.1.1.1' },
+        { ...client, id: 'owner.c.sfo', kind: 'client', label: 'owner.c.sfo', enabled: true, locationIp: '8.8.8.8' },
+        { ...client, id: 'owner.c.shanghai', kind: 'client', label: 'owner.c.shanghai', enabled: true, locationIp: '118.25.94.27' },
+        { ...server, id: 'owner.s.singapore', kind: 'server', label: 'owner.s.singapore', enabled: true, locationIp: '43.134.184.42' },
+        { ...server, id: 'owner.s.dns', kind: 'server', label: 'owner.s.dns', enabled: true, locationIp: '1.1.1.1' },
       ],
-      links: [{ id: 'tunnel-1', name: 'ssh', sourceClientId: client.id, targetServerId: server.id, type: 'tcp', remotePort: 60000, enabled: true, status: 'offline' }],
-      locatedCount: 2,
-      totalCount: 2,
+      links: [
+        { id: 'tunnel-1', name: 'ssh-primary', sourceClientId: 'owner.c.sfo', targetServerId: 'owner.s.singapore', type: 'tcp', remotePort: 60000, enabled: true, status: 'online' },
+        { id: 'tunnel-2', name: 'ssh-backup', sourceClientId: 'owner.c.sfo', targetServerId: 'owner.s.singapore', type: 'tcp', remotePort: 60001, enabled: true, status: 'pending' },
+        { id: 'tunnel-3', name: 'web', sourceClientId: 'owner.c.shanghai', targetServerId: 'owner.s.singapore', type: 'tcp', remotePort: 61000, enabled: true, status: 'offline' },
+        { id: 'tunnel-4', name: 'dns', sourceClientId: 'owner.c.shanghai', targetServerId: 'owner.s.dns', type: 'udp', remotePort: 53000, enabled: true, status: 'error' },
+      ],
+      locatedCount: 4,
+      totalCount: 4,
       generatedAt: new Date().toISOString(),
     }),
   }))
-  await page.route('**/v1/ip/geo/**', route => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({ country_code: 'US', region: 'California', city: 'Mountain View', latitude: '37.4056', longitude: '-122.0775' }),
-  }))
+  await page.route('https://get.geojs.io/v1/ip/geo/8.8.8.8.json', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ country_code: 'US', region: 'California', city: 'Mountain View', latitude: '37.4056', longitude: '-122.0775' }) }))
+  await page.route('https://get.geojs.io/v1/ip/geo/118.25.94.27.json', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ country_code: 'CN', region: 'Shanghai', city: 'Shanghai', latitude: '31.2222', longitude: '121.4581' }) }))
+  await page.route('https://get.geojs.io/v1/ip/geo/43.134.184.42.json', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ country_code: 'SG', region: 'Singapore', city: 'Singapore', latitude: '1.2872', longitude: '103.8507' }) }))
+  await page.route('https://get.geojs.io/v1/ip/geo/1.1.1.1.json', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ country_code: 'AU', region: 'Queensland', city: 'Brisbane', latitude: '-27.4679', longitude: '153.0281' }) }))
   await page.goto('/login')
   await page.getByLabel('用户名').fill('owner')
   await page.getByLabel('密码').fill('correct-password')
@@ -139,8 +145,11 @@ test('overview renders geolocated Client to Server Tunnel topology', async ({ pa
   await expect(page.getByRole('heading', { name: '网络拓扑' })).toBeVisible()
   await expect(page.locator('.topology-map-shell')).toBeVisible()
   await expect(page.locator('.maplibregl-canvas')).toBeVisible()
-  await expect(page.getByText('ssh · TCP :60000')).toBeVisible()
-  await page.waitForTimeout(1500)
+  await expect(page.getByText('ssh-primary · TCP :60000')).toBeVisible()
+  await expect(page.getByText('dns · UDP :53000')).toBeVisible()
+  await expect(page.locator('.topology-link-row')).toHaveCount(4)
+  await expect.poll(() => page.locator('canvas').count(), { timeout: 10000 }).toBeGreaterThan(1)
+  await page.waitForTimeout(500)
   expect(mapFailures).toEqual([])
   expect(pageErrors).toEqual([])
 })
