@@ -297,7 +297,7 @@ func ensureServiceIdentity(layout Layout) error {
 			return fmt.Errorf("create service user: %w: %s", err, strings.TrimSpace(string(output)))
 		}
 	case "darwin":
-		uid, err := unusedDarwinSystemID()
+		uid, gid, err := darwinServiceIDs(layout)
 		if err != nil {
 			return err
 		}
@@ -305,22 +305,79 @@ func ensureServiceIdentity(layout Layout) error {
 		account := "/Users/" + layout.ServiceUser
 		commands := [][]string{
 			{"dscl", ".", "-create", group},
-			{"dscl", ".", "-create", group, "PrimaryGroupID", strconv.Itoa(uid)},
+			{"dscl", ".", "-create", group, "PrimaryGroupID", strconv.Itoa(gid)},
 			{"dscl", ".", "-create", account},
 			{"dscl", ".", "-create", account, "UniqueID", strconv.Itoa(uid)},
-			{"dscl", ".", "-create", account, "PrimaryGroupID", strconv.Itoa(uid)},
+			{"dscl", ".", "-create", account, "PrimaryGroupID", strconv.Itoa(gid)},
 			{"dscl", ".", "-create", account, "UserShell", "/usr/bin/false"},
 			{"dscl", ".", "-create", account, "NFSHomeDirectory", layout.Data},
 			{"dscl", ".", "-create", account, "IsHidden", "1"},
 			{"dscl", ".", "-append", group, "GroupMembership", layout.ServiceUser},
 		}
 		for _, command := range commands {
-			if output, err := exec.Command(command[0], command[1:]...).CombinedOutput(); err != nil {
-				return fmt.Errorf("create service user: %w: %s", err, strings.TrimSpace(string(output)))
+			if err := runDSCL(command); err != nil {
+				return fmt.Errorf("create service user: %w", err)
 			}
 		}
 	}
 	return nil
+}
+
+// darwinServiceIDs reuses identifiers from partially-created records. A
+// previous installation can leave the group record behind while the account
+// creation is interrupted; choosing a new ID in that case would leave the
+// account and group unrelated after the retry.
+func darwinServiceIDs(layout Layout) (int, int, error) {
+	account := "/Users/" + layout.ServiceUser
+	group := "/Groups/" + layout.ServiceUser
+	uid, uidFound := darwinRecordID(account, "UniqueID")
+	gid, gidFound := darwinRecordID(account, "PrimaryGroupID")
+	if !gidFound {
+		gid, gidFound = darwinRecordID(group, "PrimaryGroupID")
+	}
+	if !uidFound {
+		var err error
+		uid, err = unusedDarwinSystemID()
+		if err != nil {
+			return 0, 0, err
+		}
+	}
+	if !gidFound {
+		gid = uid
+	}
+	return uid, gid, nil
+}
+
+func darwinRecordID(record, attribute string) (int, bool) {
+	output, err := exec.Command("dscl", ".", "-read", record, attribute).CombinedOutput()
+	if err != nil {
+		return 0, false
+	}
+	fields := strings.Fields(string(output))
+	marker := attribute + ":"
+	for index, field := range fields {
+		if field != marker || index+1 >= len(fields) {
+			continue
+		}
+		id, err := strconv.Atoi(fields[index+1])
+		if err == nil {
+			return id, true
+		}
+	}
+	return 0, false
+}
+
+func runDSCL(command []string) error {
+	output, err := exec.Command(command[0], command[1:]...).CombinedOutput()
+	if err == nil || dsclAlreadyExists(output) {
+		return nil
+	}
+	return fmt.Errorf("%s: %w: %s", strings.Join(command, " "), err, strings.TrimSpace(string(output)))
+}
+
+func dsclAlreadyExists(output []byte) bool {
+	text := string(output)
+	return strings.Contains(text, "eDSRecordAlreadyExists") || strings.Contains(text, "eDSAttributeAlreadyExists")
 }
 
 func unusedDarwinSystemID() (int, error) {

@@ -102,6 +102,24 @@ func TestServiceDefinitionsDoNotExposeCredentials(t *testing.T) {
 	}
 }
 
+func TestDSCLAlreadyExists(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		output string
+		want   bool
+	}{
+		{name: "record", output: "DS Error: eDSRecordAlreadyExists", want: true},
+		{name: "attribute", output: "DS Error: eDSAttributeAlreadyExists", want: true},
+		{name: "other error", output: "DS Error: eDSRecordNotFound", want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := dsclAlreadyExists([]byte(test.output)); got != test.want {
+				t.Fatalf("dsclAlreadyExists(%q) = %v, want %v", test.output, got, test.want)
+			}
+		})
+	}
+}
+
 func TestLinuxServiceDefinitionPassesSystemdAnalyze(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("systemd validation requires Linux")
