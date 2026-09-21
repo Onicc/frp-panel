@@ -90,18 +90,19 @@ type topologyLink struct {
 }
 
 type tunnelResource struct {
-	ID         string    `json:"id"`
-	Name       string    `json:"name"`
-	ClientID   string    `json:"clientId"`
-	ServerID   string    `json:"serverId"`
-	Type       string    `json:"type"`
-	LocalHost  string    `json:"localHost"`
-	LocalPort  int       `json:"localPort"`
-	RemotePort int       `json:"remotePort"`
-	Enabled    bool      `json:"enabled"`
-	Status     string    `json:"status"`
-	LastError  string    `json:"lastError,omitempty"`
-	UpdatedAt  time.Time `json:"updatedAt"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	ClientID      string    `json:"clientId"`
+	ServerID      string    `json:"serverId"`
+	ServerAddress string    `json:"serverAddress,omitempty"`
+	Type          string    `json:"type"`
+	LocalHost     string    `json:"localHost"`
+	LocalPort     int       `json:"localPort"`
+	RemotePort    int       `json:"remotePort"`
+	Enabled       bool      `json:"enabled"`
+	Status        string    `json:"status"`
+	LastError     string    `json:"lastError,omitempty"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 type enrollmentPayload struct {
@@ -1037,7 +1038,7 @@ func createTunnelResource(appInstance app.Application) gin.HandlerFunc {
 			return
 		}
 		go reconcileTunnel(appInstance, item.ID)
-		c.JSON(201, gin.H{"tunnel": tunnelToResource(appInstance, item)})
+		c.JSON(201, gin.H{"tunnel": tunnelToResource(appInstance, db, item)})
 	}
 }
 
@@ -1063,7 +1064,7 @@ func listTunnelsResource(appInstance app.Application) gin.HandlerFunc {
 			}
 			items := make([]tunnelResource, 0, len(all))
 			for i := range all {
-				r := tunnelToResource(appInstance, &all[i])
+				r := tunnelToResource(appInstance, db, &all[i])
 				if r.Status == status {
 					items = append(items, r)
 				}
@@ -1083,7 +1084,7 @@ func listTunnelsResource(appInstance app.Application) gin.HandlerFunc {
 		}
 		items := make([]tunnelResource, 0, len(rows))
 		for i := range rows {
-			r := tunnelToResource(appInstance, &rows[i])
+			r := tunnelToResource(appInstance, db, &rows[i])
 			items = append(items, r)
 		}
 		c.JSON(200, pageResult[tunnelResource]{Items: items, Total: total, Page: page, PageSize: size})
@@ -1103,7 +1104,7 @@ func getTunnel(appInstance app.Application) gin.HandlerFunc {
 			AbortProblem(c, 404, "Tunnel not found", "the requested Tunnel does not exist")
 			return
 		}
-		c.JSON(200, gin.H{"tunnel": tunnelToResource(appInstance, &item)})
+		c.JSON(200, gin.H{"tunnel": tunnelToResource(appInstance, db, &item)})
 	}
 }
 
@@ -1190,7 +1191,7 @@ func patchTunnel(appInstance app.Application) gin.HandlerFunc {
 		if previousClientID != item.OriginClientID || previousServerID != item.ServerID {
 			go applyTunnelPair(appInstance, item.OriginClientID, item.ServerID)
 		}
-		c.JSON(200, gin.H{"tunnel": tunnelToResource(appInstance, &item)})
+		c.JSON(200, gin.H{"tunnel": tunnelToResource(appInstance, db, &item)})
 	}
 }
 
@@ -1303,7 +1304,7 @@ func topology(appInstance app.Application) gin.HandlerFunc {
 			if _, ok := serverIDs[item.ServerID]; !ok {
 				continue
 			}
-			resource := tunnelToResource(appInstance, item)
+			resource := tunnelToResource(appInstance, db, item)
 			links = append(links, topologyLink{
 				ID: resource.ID, Name: resource.Name, SourceClientID: resource.ClientID,
 				TargetServerID: resource.ServerID, Type: resource.Type, RemotePort: resource.RemotePort,
@@ -1339,9 +1340,16 @@ func tunnelFromModel(item *models.ProxyConfig) tunnelRequest {
 	return r
 }
 func boolPtr(value bool) *bool { return &value }
-func tunnelToResource(appInstance app.Application, item *models.ProxyConfig) tunnelResource {
+func tunnelToResource(appInstance app.Application, db *gorm.DB, item *models.ProxyConfig) tunnelResource {
 	r := tunnelFromModel(item)
-	return tunnelResource{ID: item.PublicID, Name: item.Name, ClientID: item.OriginClientID, ServerID: item.ServerID, Type: item.Type, LocalHost: r.LocalHost, LocalPort: r.LocalPort, RemotePort: r.RemotePort, Enabled: !item.Stopped, Status: tunnelStatus(appInstance, item), LastError: item.LastError, UpdatedAt: item.UpdatedAt}
+	serverAddress := ""
+	if db != nil && item.ServerID != "" {
+		var server models.Server
+		if err := db.Where("server_id = ? AND user_id = ? AND tenant_id = ?", item.ServerID, item.UserID, item.TenantID).First(&server).Error; err == nil && server.ServerEntity != nil {
+			serverAddress = server.ServerIP
+		}
+	}
+	return tunnelResource{ID: item.PublicID, Name: item.Name, ClientID: item.OriginClientID, ServerID: item.ServerID, ServerAddress: serverAddress, Type: item.Type, LocalHost: r.LocalHost, LocalPort: r.LocalPort, RemotePort: r.RemotePort, Enabled: !item.Stopped, Status: tunnelStatus(appInstance, item), LastError: item.LastError, UpdatedAt: item.UpdatedAt}
 }
 
 func makeEnrollment(appInstance app.Application, id, kind string, serverAPIPort int, token string, expires time.Time) enrollmentPayload {

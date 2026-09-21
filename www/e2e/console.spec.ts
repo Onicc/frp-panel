@@ -25,6 +25,7 @@ test('login renders with the production strict CSP', async ({ page }) => {
   })
   await page.goto('/login')
   await expect(page.getByRole('heading', { name: '登录 Master' })).toBeVisible()
+  await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/frppanel-logo.svg')
   expect(pageErrors).toEqual([])
 })
 
@@ -47,6 +48,7 @@ test('authenticated console exposes resource states and controlled dialogs', asy
   await page.getByLabel('密码').fill('correct-password')
   await page.getByRole('button', { name: '继续' }).click()
   await expect(page).toHaveURL('/')
+  await expect(page.locator('.sidebar-footer')).toContainText('FRP PANEL')
   await page.getByRole('complementary', { name: 'Primary navigation' }).getByRole('link', { name: 'Clients', exact: true }).click()
   await expect(page.getByText('owner.c.mac')).toBeVisible()
   await page.getByRole('button', { name: '添加 Client' }).click()
@@ -95,6 +97,42 @@ test('Server creation exposes a configurable API port and blocks equal ports', a
   await dialog.getByRole('button', { name: '保存' }).click()
   await expect(page.getByText('SERVER_API_PORT: "8998"')).toBeVisible()
   expect(createBody).toMatchObject({ bindPort: 7001, serverApiPort: 8998 })
+})
+
+test('Tunnels waits for initial resources and shows the Server remote connection', async ({ page }) => {
+  await mockAPI(page)
+  const tunnel = {
+    id: 'tunnel-ssh', name: 'ssh-primary', clientId: client.id, serverId: server.id,
+    serverAddress: '43.134.184.42', type: 'tcp', localHost: '127.0.0.1', localPort: 22,
+    remotePort: 60000, enabled: true, status: 'online', updatedAt: new Date().toISOString(),
+  }
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  const delayedResponses: Record<string, unknown> = {
+    clients: { items: [client], total: 1, page: 1, pageSize: 100 },
+    servers: { items: [server], total: 1, page: 1, pageSize: 100 },
+    tunnels: { items: [tunnel], total: 1, page: 1, pageSize: 25 },
+  }
+  for (const [resource, payload] of Object.entries(delayedResponses)) {
+    await page.route(`**/api/v2/${resource}**`, async route => {
+      if (route.request().method() !== 'GET') {
+        await route.fallback()
+        return
+      }
+      await gate
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) })
+    })
+  }
+  await page.goto('/login')
+  await page.getByLabel('用户名').fill('owner')
+  await page.getByLabel('密码').fill('correct-password')
+  await page.getByRole('button', { name: '继续' }).click()
+  await page.getByRole('complementary', { name: 'Primary navigation' }).getByRole('link', { name: 'Tunnels', exact: true }).click()
+
+  await expect(page.locator('.notice-card')).toHaveCount(0)
+  release()
+  await expect(page.getByRole('columnheader', { name: '远程连接' })).toBeVisible()
+  await expect(page.getByText('43.134.184.42:60000', { exact: true })).toBeVisible()
 })
 
 test('overview renders geolocated Client to Server Tunnel topology', async ({ page }) => {

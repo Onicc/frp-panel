@@ -1,7 +1,9 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 export function useAutoRefresh(callback: () => Promise<void>, interval = 5000) {
-  const loading = ref(false)
+  // The first request starts on mount. Keep consumers in a loading state until
+  // it completes so empty-state copy does not flash before data arrives.
+  const loading = ref(true)
   const refreshing = ref(false)
   let timer: number | undefined
   let inFlight = false

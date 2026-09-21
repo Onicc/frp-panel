@@ -54,6 +54,7 @@ func resourceRouter(a app.Application, user *models.UserEntity) *gin.Engine {
 	r.PATCH("/servers/:id", patchServer(a))
 	r.DELETE("/servers/:id", deleteServer(a))
 	r.POST("/tunnels", createTunnelResource(a))
+	r.GET("/tunnels", listTunnelsResource(a))
 	r.PATCH("/tunnels/:id", patchTunnel(a))
 	r.DELETE("/tunnels/:id", deleteTunnelResource(a))
 	return r
@@ -88,6 +89,16 @@ func TestTunnelUpdateChangesServerAndProtectsRemotePort(t *testing.T) {
 	if err := json.Unmarshal(created.Body.Bytes(), &first); err != nil {
 		t.Fatal(err)
 	}
+	if first.Tunnel.ServerAddress != "a.example.test" {
+		t.Fatalf("created tunnel server address = %q", first.Tunnel.ServerAddress)
+	}
+	var listed struct {
+		Items []tunnelResource `json:"items"`
+	}
+	listRec := request(http.MethodGet, "/tunnels?page=1&pageSize=25", "")
+	if listRec.Code != http.StatusOK || json.Unmarshal(listRec.Body.Bytes(), &listed) != nil || len(listed.Items) == 0 || listed.Items[0].ServerAddress != "a.example.test" {
+		t.Fatalf("listed tunnel server address = %d %s", listRec.Code, listRec.Body.String())
+	}
 	conflict := request(http.MethodPost, "/tunnels", `{"name":"ssh-b","clientId":"mac","serverId":"edge-a","type":"tcp","localPort":23,"remotePort":6022}`)
 	if conflict.Code != http.StatusConflict || !strings.Contains(conflict.Body.String(), "Remote port already in use") {
 		t.Fatalf("remote port conflict = %d %s", conflict.Code, conflict.Body.String())
@@ -115,6 +126,9 @@ func TestTunnelUpdateChangesServerAndProtectsRemotePort(t *testing.T) {
 	}
 	if movedPayload.Tunnel.ServerID != "owner.s.edge-b" {
 		t.Fatalf("moved tunnel server = %q", movedPayload.Tunnel.ServerID)
+	}
+	if movedPayload.Tunnel.ServerAddress != "b.example.test" {
+		t.Fatalf("moved tunnel server address = %q", movedPayload.Tunnel.ServerAddress)
 	}
 	var stored models.ProxyConfig
 	if err := a.GetDBManager().GetDefaultDB().Where("public_id = ?", first.Tunnel.ID).First(&stored).Error; err != nil {

@@ -31,7 +31,7 @@
     </nav>
 
     <div class="sidebar-footer">
-      <div class="sidebar-status"><span class="status-pulse"></span><span>FRP {{ version }}</span></div>
+      <div class="sidebar-status"><span class="status-pulse"></span><span>{{ t('brand.product') }}</span></div>
       <span class="sidebar-footer-caption">{{ t('nav.masterHint') }}</span>
     </div>
   </aside>
@@ -48,6 +48,5 @@ defineProps<{ mobileOpen?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const route = useRoute()
 const { t } = useI18n()
-const version = import.meta.env.VITE_APP_VERSION || '2'
 const isActive = (path: string) => path === '/' ? route.path === '/' : route.path.startsWith(path)
 </script>

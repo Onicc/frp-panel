@@ -14,7 +14,7 @@
       </div>
     </div>
 
-    <div v-if="!clients.length || !servers.length" class="notice-card">
+    <div v-if="!loading && (!clients.length || !servers.length)" class="notice-card">
       <strong>{{ t('tunnels.emptyHint') }}</strong>
       <p>
         <RouterLink to="/clients">{{ t('nav.clients') }}</RouterLink>
@@ -37,7 +37,7 @@
             <th>{{ t('tunnels.server') }}</th>
             <th>{{ t('tunnels.type') }}</th>
             <th>{{ t('tunnels.connection') }}</th>
-            <th class="num">{{ t('tunnels.remotePort') }}</th>
+            <th>{{ t('tunnels.remoteConnection') }}</th>
             <th>{{ t('tunnels.status') }}</th>
             <th class="actions-col">&nbsp;</th>
           </tr>
@@ -54,7 +54,7 @@
             <td class="muted">{{ shortId(item.serverId) }}</td>
             <td><span class="protocol-badge">{{ item.type }}</span></td>
             <td><span class="mono">{{ item.localHost }}:{{ item.localPort }}</span></td>
-            <td class="num mono">{{ item.remotePort }}</td>
+            <td class="mono">{{ remoteConnection(item) }}</td>
             <td><StatusBadge :status="item.status" /></td>
             <td class="row-actions">
               <button class="icon-button" type="button" :title="t('common.edit')" @click="openEdit(item)"><Icon name="edit" size="sm" /></button>
@@ -161,6 +161,11 @@ const form = reactive({ name: '', clientId: '', serverId: '', type: 'tcp', local
 const deleteMessage = computed(() => selected.value ? `${t('tunnels.deleteMessage')} ${selected.value.name}` : '')
 
 const shortId = (id: string) => id.split('.').pop() || id
+const remoteConnection = (item: Tunnel) => {
+  const address = item.serverAddress || shortId(item.serverId)
+  const displayAddress = address.includes(':') && !address.startsWith('[') ? `[${address}]` : address
+  return `${displayAddress}:${item.remotePort}`
+}
 
 const loadData = async () => {
   try {
