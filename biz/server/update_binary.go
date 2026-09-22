@@ -42,7 +42,7 @@ func HandleUpdateRequest(_ *app.Context, req *pb.UpgradeFrppRequest) (*pb.Upgrad
 	}
 	version := conf.GetVersion()
 	if release.Channel(version.GitVersion) != "stable" {
-		return nil, fmt.Errorf("Server requires a one-time manual migration to a vX.X.X image before panel updates")
+		return nil, fmt.Errorf("server requires a one-time manual migration to a vX.X.X image before panel updates")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	snapshot, rel := release.Default.Check(ctx, *version, true)
