@@ -65,11 +65,13 @@ func releaseStatus(application app.Application) gin.HandlerFunc {
 		}
 		channel := c.Query("channel")
 		if channel != "" && channel != "edge" && channel != "stable" {
-			AbortProblem(c, 400, "Invalid channel", "use edge or stable")
+			AbortProblem(c, 400, "Invalid channel", "use stable")
 			return
 		}
 		var snapshot release.Snapshot
-		if channel == "" || channel == release.Channel(conf.GetVersion().GitVersion) {
+		if channel == "edge" {
+			snapshot = release.Snapshot{Channel: "legacy", CheckedAt: time.Now().UTC(), Error: "edge builds require a one-time manual migration to a stable release"}
+		} else if channel == "" || channel == release.Channel(conf.GetVersion().GitVersion) {
 			snapshot, _ = release.Default.Check(c.Request.Context(), *conf.GetVersion(), c.Query("force") == "true")
 		} else {
 			snapshot = release.Snapshot{Channel: channel, CheckedAt: time.Now().UTC()}
@@ -93,6 +95,10 @@ func releaseStatus(application app.Application) gin.HandlerFunc {
 func startMasterUpdate(application app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !ownerOnly(c) {
+			return
+		}
+		if release.Channel(conf.GetVersion().GitVersion) == "legacy" {
+			AbortProblem(c, 409, "Manual migration required", "redeploy the Master with a vX.X.X image before using web updates")
 			return
 		}
 		if !containerupdate.Enabled() {
@@ -258,6 +264,9 @@ func startServerUpdate(application app.Application, server models.Server, mode s
 			return models.UpdateOperation{}, fmt.Errorf("server version unavailable: %w", err)
 		}
 	}
+	if release.Channel(version.GitVersion) == "legacy" {
+		return models.UpdateOperation{}, errors.New("redeploy this Server with a vX.X.X image before using panel updates")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	snapshot, rel := release.Default.Check(ctx, *version, false)
 	cancel()
@@ -398,6 +407,9 @@ func ScheduleServerUpdates(application app.Application) {
 	now := time.Now().UTC()
 	for _, server := range servers {
 		if !withinWindow(server.ServerEntity, now) || application.GetClientsManager().Get(server.ServerID) == nil {
+			continue
+		}
+		if version := versions.Decode(server.LastVersion); version == nil || release.Channel(version.GitVersion) != "stable" {
 			continue
 		}
 		var previous models.UpdateOperation

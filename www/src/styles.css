@@ -156,6 +156,8 @@ svg.w-8 { width: 2rem; }
 
 .sidebar-header {
   display: flex;
+  position: relative;
+  z-index: 2;
   min-height: 86px;
   flex-direction: column;
   align-items: flex-start;
@@ -165,17 +167,59 @@ svg.w-8 { width: 2rem; }
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 
-.sidebar-version { position: relative; margin-left: 49px; }
-.version-pill { display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 2px 5px; border-radius: 6px; color: var(--text-soft); background: transparent; font: 600 .7rem var(--font-mono); cursor: pointer; }
-.version-pill:hover, .version-pill[aria-expanded="true"] { color: var(--accent); background: var(--accent-lo); }
-.version-pill svg { width: 12px; height: 12px; }
-.version-indicator { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-.version-popover { position: absolute; z-index: 60; top: -46px; left: 183px; width: min(300px, calc(100vw - 280px)); padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); box-shadow: var(--shadow-lg); }
-@media (max-width: 620px) { .version-popover { top: calc(100% + 9px); left: -49px; width: min(300px, calc(100vw - 32px)); } }
-.version-popover-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; color: var(--text); font-size: .82rem; }
-.version-line { display: flex; gap: 8px; margin: 6px 0; color: var(--text-muted); font-size: .76rem; }
-.version-line .mono { color: var(--text); overflow-wrap: anywhere; }
-.version-update-button { width: 100%; justify-content: center; margin: 10px 0; }
+.sidebar-version { position: relative; margin-left: 49px; line-height: 1; }
+.version-pill { display: inline-flex; min-height: 24px; align-items: center; gap: 6px; border: 0; border-radius: 8px; padding: 4px 8px; color: var(--text-muted); background: var(--surface-3); font-size: 12px; font-weight: 600; line-height: 16px; cursor: pointer; transition: background .2s var(--ease), color .2s var(--ease); }
+.version-pill:hover, .version-pill[aria-expanded="true"] { color: var(--text); background: color-mix(in srgb, var(--surface-3) 75%, var(--border-hi)); }
+.version-pill.has-update { color: var(--warn); background: var(--warn-lo); }
+.version-pill.has-update:hover, .version-pill.has-update[aria-expanded="true"] { background: color-mix(in srgb, var(--warn-lo) 70%, var(--warn) 30%); }
+.version-static { color: var(--text-muted); font-size: 12px; }
+.version-indicator { position: relative; display: inline-flex; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.version-indicator span { position: absolute; inset: 0; border-radius: 50%; background: var(--warn); opacity: .55; animation: version-ping 1.5s infinite; }
+.version-popover { position: absolute; z-index: 60; top: calc(100% + 8px); left: 0; width: 256px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); box-shadow: var(--shadow-menu); white-space: normal; line-height: 1.5; }
+.version-popover-header { display: flex; height: 49px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding: 0 16px; color: var(--text); font-size: 14px; font-weight: 600; }
+.version-refresh { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; border: 0; border-radius: 8px; color: var(--text-soft); background: transparent; cursor: pointer; }
+.version-refresh:hover { color: var(--text); background: var(--surface-3); }
+.version-popover-body { padding: 16px; }
+.version-loading { display: flex; height: 96px; align-items: center; justify-content: center; color: var(--accent); }
+.version-current { margin-bottom: 16px; text-align: center; }
+.version-current-value { display: inline-flex; min-height: 32px; align-items: center; gap: 8px; }
+.version-current-value strong { color: var(--text); font-size: 24px; font-weight: 700; line-height: 32px; }
+.version-current-check { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 50%; color: var(--ok); background: var(--ok-lo); }
+.version-current p { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; }
+.version-notice { display: flex; align-items: center; gap: 12px; border: 1px solid; border-radius: 8px; padding: 12px; }
+.version-notice-icon { display: inline-flex; width: 32px; height: 32px; flex: none; align-items: center; justify-content: center; border-radius: 50%; }
+.version-notice-copy { display: flex; min-width: 0; flex-direction: column; }
+.version-notice-copy strong { font-size: 14px; font-weight: 600; }
+.version-notice-copy small { max-height: 60px; overflow: auto; font-size: 12px; overflow-wrap: anywhere; }
+.version-notice-update { border-color: color-mix(in srgb, var(--warn) 25%, var(--border)); color: var(--warn); background: var(--warn-lo); }
+.version-notice-update .version-notice-icon { background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.version-notice-info { border-color: color-mix(in srgb, var(--info) 25%, var(--border)); color: var(--info); background: var(--info-lo); }
+.version-notice-info .version-notice-icon { background: color-mix(in srgb, var(--info) 14%, transparent); }
+.version-notice-success { border-color: color-mix(in srgb, var(--ok) 25%, var(--border)); color: var(--ok); background: var(--ok-lo); }
+.version-notice-success .version-notice-icon { background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.version-notice-error { border-color: color-mix(in srgb, var(--err) 25%, var(--border)); color: var(--err); background: var(--err-lo); }
+.version-notice-error .version-notice-icon { background: color-mix(in srgb, var(--err) 14%, transparent); }
+.version-hint { margin: 8px 0 0; color: var(--info); font-size: 12px; }
+.version-action, .version-retry { display: flex; width: 100%; min-height: 36px; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; border: 0; border-radius: 8px; color: white; background: var(--accent); font-size: 14px; font-weight: 600; cursor: pointer; }
+.version-action:hover, .version-retry:hover { background: var(--accent-hi); }
+.version-action:disabled { opacity: .55; cursor: not-allowed; }
+.version-retry { background: var(--err); }
+.version-retry:hover { background: color-mix(in srgb, var(--err) 80%, black); }
+.version-release-link { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 8px; padding: 4px 0; color: var(--text-muted); font-size: 12px; text-decoration: none; }
+.version-release-link:hover { color: var(--text); }
+.version-rollback { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
+.version-rollback-toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; border: 0; border-radius: 8px; padding: 6px 8px; color: var(--text-soft); background: transparent; font-size: 12px; cursor: pointer; }
+.version-rollback-toggle:hover { color: var(--text-muted); background: var(--surface-3); }
+.version-rollback-toggle span { display: inline-flex; align-items: center; gap: 6px; }
+.version-rollback-toggle > svg { transition: transform .2s var(--ease); }
+.version-rollback-toggle > svg.is-open { transform: rotate(180deg); }
+.version-rollback-hint { margin: 8px 0 0; border: 1px solid color-mix(in srgb, var(--info) 25%, var(--border)); border-radius: 8px; padding: 10px; color: var(--info); background: var(--info-lo); font-size: 12px; }
+.version-dropdown-enter-active, .version-dropdown-leave-active { transition: opacity .2s var(--ease), transform .2s var(--ease); }
+.version-dropdown-enter-from, .version-dropdown-leave-to { opacity: 0; transform: translateY(-4px) scale(.95); }
+.version-spin { animation: version-spin 1s linear infinite; }
+@keyframes version-spin { to { transform: rotate(360deg); } }
+@keyframes version-ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+@media (max-width: 620px) { .version-popover { left: -49px; width: min(256px, calc(100vw - 48px)); } }
 .version-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 118px; font-size: .75rem; }
 .version-cell .field-hint { flex-basis: 100%; max-width: 220px; margin: 0; overflow-wrap: anywhere; }
 .version-new { font-size: .72rem; white-space: nowrap; }

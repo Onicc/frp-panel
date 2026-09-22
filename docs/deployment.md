@@ -30,7 +30,7 @@
 ```yaml
 services:
   master:
-    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:edge}
+    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:v2.1.0}
     restart: unless-stopped
     environment:
       APP_GLOBAL_SECRET: ${APP_GLOBAL_SECRET:?set a random 32+ character secret}
@@ -55,7 +55,7 @@ volumes:
 ### .env
 
 ```dotenv
-FRP_PANEL_IMAGE=onicc/frp-panel:edge
+FRP_PANEL_IMAGE=onicc/frp-panel:v2.1.0
 
 APP_GLOBAL_SECRET=REPLACE_WITH_A_RANDOM_32_BYTE_OR_LONGER_SECRET
 APP_COOKIE_SECURE=true
@@ -73,7 +73,7 @@ PUBLIC_URL=https://panel.example.com
 - `PUBLIC_URL` 是唯一需要配置的 Master 公开地址，必须是无路径的完整 `http://` 或 `https://` URL。HTTPS 会自动派生 `wss://` RPC 地址。
 - `APP_AGENT_INSTALL_URL` 仅在使用 fork 或内部镜像时设置；它必须包含 `install.sh` 与 `install.ps1`。
 - 生产环境使用 `APP_COOKIE_SECURE=true` 时，必须让 HTTPS 反向代理转发 Web、API 和 WebSocket 流量至 `127.0.0.1:9000`；仓库 Compose 不直接提供公网 TLS。
-- `edge` 会随 `main` 更新；生产环境应固定到已验证的 `v*` 镜像标签。
+- `edge` 已停止后续发布；Master 和 Server 应固定到同一个经验证的 `vX.X.X` 镜像标签。`latest` 仅是最新正式版的可变别名。
 
 Master 只需开放 Web/API/RPC 入口，不应映射 `7000` 或任何业务 remote port。
 
@@ -98,7 +98,7 @@ Master 只需开放 Web/API/RPC 入口，不应映射 `7000` 或任何业务 rem
 ```yaml
 services:
   frps:
-    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:edge}
+    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:v2.1.0}
     restart: unless-stopped
     network_mode: host
     command:
@@ -163,11 +163,17 @@ Client 上线后无需预先绑定 Server。打开 **Tunnels → 创建 Tunnel**
 
 ## 6. 版本检查与升级
 
-Master 左上角显示当前版本和同一发布通道的 GitHub 新版本。首次使用网页升级前，**必须先拉取并重新部署一次含更新启动器的镜像**；旧镜像不能仅凭设置环境变量获得该能力。之后 Owner 可在左上角手动升级 Master。升级包下载到原有 `/data` 卷，校验官方 `checksums.txt`、平台和提交版本后由容器内启动器重启；新进程未能健康启动会回退到镜像或上一个已验证版本。更新期间 Web/API 短暂不可用，浏览器会继续查询任务结果。Docker 镜像本身不会被网页升级；重新拉取新镜像并部署后，新镜像优先于卷内旧程序。部署前备份数据卷，并保持 Master/Server 镜像更新到兼容版本。
+正式发布的网页和 Agent 显示实际 `vX.X.X`，悬停可核对提交号。旧 `edge` 节点显示“旧测试版”，不会伪装成正式版；开发构建也不假装拥有正式版本号。
 
-Servers 列表显示每台机器上报的版本；管理员可从版本号旁手动更新，或在“更新设置”中开启自动更新并指定 IANA 时区和同一天内的维护窗口（默认 `UTC 03:00–04:00`）。自动更新默认关闭，窗口内每日最多尝试一次，沿用该 Server 当前的 `edge` 或稳定版通道。升级会短暂中断该 Server 的隧道；页面分别显示下载、校验、重启、验证、成功或回退。首次启用前同样要为每台 Server 重新拉取并部署一次新镜像，保留原 `/data` 卷。若 Server 离线、版本无法确认或未找到可靠的新版本，不执行更新。
+Master 左上角显示当前版本和 GitHub 最新正式版。首次使用网页升级前，**必须先拉取并重新部署一次含更新启动器的镜像**；旧镜像不能仅凭设置环境变量获得该能力。之后 Owner 可在左上角手动升级 Master。升级包下载到原有 `/data` 卷，校验官方 `checksums.txt`、平台和提交版本后由容器内启动器重启；新进程未能健康启动会回退到镜像或上一个已验证版本。更新期间 Web/API 短暂不可用，浏览器会继续查询任务结果。Docker 镜像本身不会被网页升级；重新拉取新镜像并部署后，新镜像优先于卷内旧程序。部署前备份数据卷，并保持 Master/Server 镜像更新到兼容版本。
+
+Servers 列表显示每台机器上报的版本；管理员可从版本号旁手动更新，或在“更新设置”中开启自动更新并指定 IANA 时区和同一天内的维护窗口（默认 `UTC 03:00–04:00`）。自动更新默认关闭，窗口内每日最多尝试一次，只跟踪正式版。旧 `edge` Server 的自动更新暂停，须先手动更换镜像，之后原设置继续生效。升级会短暂中断隧道；页面分别显示下载、校验、重启、验证、成功或回退。首次启用前同样要为每台 Server 重新拉取并部署一次新镜像，保留原 `/data` 卷。若 Server 离线、版本无法确认或未找到可靠的新版本，不执行更新。
 
 Clients 仅上报版本。出现新版本时，点击版本号旁的提示，复制对应系统的本地升级命令，在目标 Client 主机执行；网页不会远程升级或重启 Client。macOS 旧版 Agent 的内置自动重启可能失败，因此页面提供分步的升级和原生服务重启命令。执行后确认版本刷新和 Agent 在线。手动 Docker 更新依旧可用，例如在原 Compose 目录执行 `docker compose pull && docker compose up -d`；不要删除卷。
+
+### 从旧 `edge` 一次迁移到 `v2.1.0`
+
+先确认 [v2.1.0 Release](https://github.com/Onicc/frp-panel/releases/tag/v2.1.0) 的二进制与两种 Docker 镜像均已发布，并备份 Master、每台 Server 的数据卷。按 Master → Server → Client 顺序操作：在各自主机 `.env` 中将 `FRP_PANEL_IMAGE` 固定为 `onicc/frp-panel:v2.1.0`，分别执行 `docker compose pull` 和 `docker compose up -d`，不得删除或重建数据卷；每台 Client 在管理页面复制带 `--version v2.1.0` 的系统专属命令执行。macOS 使用页面提供的分步重启方式。逐台确认在线状态及现有 TCP/UDP Tunnel 连通后再继续下一台。网页内更新只替换运行二进制，不会改 Compose 镜像标签；后续升级仍须同步提升镜像基线，避免镜像重建时回到旧版。
 
 ## 7. 网络端口
 

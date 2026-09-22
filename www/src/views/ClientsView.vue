@@ -68,8 +68,9 @@
             <td><StatusBadge :status="item.status" /></td>
             <td>
               <div class="version-cell">
-                <span class="mono">{{ formatVersion(item.version) }}</span>
+                <span class="mono" :title="displayVersionDetails(item.version?.gitVersion, item.version?.gitCommit, versionLabels)">{{ formatVersion(item.version) }}</span>
                 <button v-if="hasUpdate(item)" class="text-button version-new" type="button" @click="openUpgrade(item)">{{ t('updates.newVersion') }}</button>
+                <button v-else-if="hasMigration(item)" class="text-button version-new" type="button" @click="openUpgrade(item)">{{ t('updates.migration') }}</button>
               </div>
             </td>
             <td class="num">{{ item.tunnelCount }}</td>
@@ -169,6 +170,7 @@ import { api, APIError, type Client } from '../api'
 import { useToastStore } from '../stores/toast'
 import { useAutoRefresh } from '../composables/useAutoRefresh'
 import { cachedRelease, clientUpdateCommand, hasNewRelease, loadRelease, versionChannel } from '../composables/useReleaseInfo'
+import { displayVersion, displayVersionDetails } from '../composables/displayVersion'
 import type { ReleaseSnapshot, VersionInfo } from '../api'
 
 const { t } = useI18n()
@@ -183,7 +185,7 @@ const search       = ref('')
 const stateFilter  = ref('')
 const statusFilter = ref('')
 const dialog   = ref<'create'|'edit'|'rotate'|'delete'|'upgrade'|''>('')
-const releases = ref<Partial<Record<'edge'|'stable', ReleaseSnapshot>>>({})
+const releases = ref<Partial<Record<'stable', ReleaseSnapshot>>>({})
 const selected = ref<Client>()
 const modalError = ref('')
 const copied   = ref(false)
@@ -197,16 +199,18 @@ const platforms = [
 const latestInstall = computed(() =>
   enrollmentCommands.value[platform.value] || enrollmentCommands.value.linux || ''
 )
-const upgradeCommand = computed(() => selected.value?.version ? clientUpdateCommand(selected.value.version, releases.value[versionChannel(selected.value.version) || 'edge']?.latestVersion || '') : '')
-const formatVersion = (version?: VersionInfo) => version ? `${version.gitVersion === 'main' ? 'edge' : version.gitVersion} · ${version.gitCommit.slice(0, 7)}` : '—'
+const upgradeCommand = computed(() => selected.value?.version ? clientUpdateCommand(selected.value.version, releases.value.stable?.latestVersion || '') : '')
+const versionLabels = computed(() => ({ legacy: t('updates.legacyVersion'), development: t('updates.developmentVersion') }))
+const formatVersion = (version?: VersionInfo) => displayVersion(version?.gitVersion, versionLabels.value)
 const hasUpdate = (item: Client) => {
   const channel = versionChannel(item.version)
-  return channel && hasNewRelease(item.version, releases.value[channel] || cachedRelease(channel)) === true
+  return channel === 'stable' && hasNewRelease(item.version, releases.value.stable || cachedRelease('stable')) === true
 }
+const hasMigration = (item: Client) => versionChannel(item.version) === 'legacy' && !!releases.value.stable?.latestVersion && !releases.value.stable?.error
 const openUpgrade = (item: Client) => { selected.value = item; dialog.value = 'upgrade' }
 const refreshReleases = async (items: Client[]) => {
-  for (const channel of new Set(items.map((item) => versionChannel(item.version)).filter((value): value is 'edge'|'stable' => value !== null))) {
-    try { releases.value[channel] = await loadRelease(channel) } catch { /* status remains unknown */ }
+  if (items.some((item) => versionChannel(item.version))) {
+    try { releases.value.stable = await loadRelease('stable') } catch { /* status remains unknown */ }
   }
 }
 const statuses = ['pending', 'online', 'offline', 'error', 'disabled']

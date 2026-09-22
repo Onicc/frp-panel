@@ -41,8 +41,8 @@ func HandleUpdateRequest(_ *app.Context, req *pb.UpgradeFrppRequest) (*pb.Upgrad
 		return nil, fmt.Errorf("custom update parameters are not accepted")
 	}
 	version := conf.GetVersion()
-	if release.Channel(version.GitVersion) == "unknown" {
-		return nil, fmt.Errorf("unknown Server update channel")
+	if release.Channel(version.GitVersion) != "stable" {
+		return nil, fmt.Errorf("Server requires a one-time manual migration to a vX.X.X image before panel updates")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	snapshot, rel := release.Default.Check(ctx, *version, true)

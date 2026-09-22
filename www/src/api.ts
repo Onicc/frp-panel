@@ -1,7 +1,7 @@
 export type Account = { username:string; email:string; role:string }
 export type VersionInfo = { gitVersion:string; gitCommit:string; gitBranch?:string; buildDate:string; platform:string }
 export type UpdateOperation = { id:string; kind:'master'|'server'; targetId:string; targetCommit:string; version:string; state:'queued'|'downloading'|'staged'|'restarting'|'verifying'|'succeeded'|'failed'|'rolled_back'; error?:string; startedAt:string; updatedAt:string; completedAt?:string }
-export type ReleaseSnapshot = { channel:'edge'|'stable'|'unknown'; currentVersion:string; currentCommit:string; latestVersion?:string; latestCommit?:string; releaseUrl?:string; publishedAt?:string; available:boolean|null; checkedAt:string; error?:string }
+export type ReleaseSnapshot = { channel:'legacy'|'stable'|'unknown'; currentVersion:string; currentCommit:string; latestVersion?:string; latestCommit?:string; releaseUrl?:string; publishedAt?:string; available:boolean|null; checkedAt:string; error?:string }
 export type Client = { id:string; comment:string; configurationState:'configured'|'unconfigured'; status:'pending'|'online'|'offline'|'error'|'disabled'; enabled:boolean; lastSeenAt?:string; enrolledAt?:string; tunnelCount:number; locationIpOverride?:string; version?:VersionInfo; versionAt?:string }
 export type Server = { id:string; address:string; bindPort:number; serverApiPort:number; comment:string; configurationState:'configured'|'unconfigured'; status:'pending'|'online'|'offline'|'error'|'disabled'; lastSeenAt?:string; enrolledAt?:string; tunnelCount:number; version?:VersionInfo; versionAt?:string; autoUpdate:boolean; updateZone:string; updateStart:string; updateEnd:string; updateOperation?:UpdateOperation }
 export type Tunnel = { id:string; name:string; clientId:string; serverId:string; serverAddress?:string; type:'tcp'|'udp'; localHost:string; localPort:number; remotePort:number; enabled:boolean; status:string; lastError?:string; updatedAt:string }
@@ -28,7 +28,7 @@ export const api={
   changePassword:(currentPassword:string,newPassword:string)=>request<{reauthenticate:boolean}>('/api/v2/account/password',{method:'POST',body:JSON.stringify({currentPassword,newPassword})}),
   overview:()=>request<{clients:number;servers:number;tunnels:number}>('/api/v2/overview'),
   topology:()=>request<TopologyResponse>('/api/v2/topology'),
-  release:(channel?:'edge'|'stable',force=false)=>request<{release:ReleaseSnapshot;supported:boolean;operation?:UpdateOperation}>(`/api/v2/updates/release${query({channel,force:force?'true':undefined})}`),
+  release:(channel?:'stable',force=false)=>request<{release:ReleaseSnapshot;supported:boolean;operation?:UpdateOperation}>(`/api/v2/updates/release${query({channel,force:force?'true':undefined})}`),
   updateMaster:()=>request<{operationId:string}>('/api/v2/updates/master',{method:'POST'}),
   updateOperation:(id:string)=>request<{operation:UpdateOperation}>(`/api/v2/updates/operations/${encodeURIComponent(id)}`),
   clients:(params:Record<string,string|number|undefined>={})=>request<Page<Client>>(`/api/v2/clients${query(params)}`),

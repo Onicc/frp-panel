@@ -11,7 +11,7 @@ import (
 	"github.com/Onicc/frp-panel/conf"
 )
 
-func TestCheckerChannelsAndCommitAncestry(t *testing.T) {
+func TestCheckerStableAndLegacyChannels(t *testing.T) {
 	oldCommit := strings.Repeat("a", 40)
 	newCommit := strings.Repeat("b", 40)
 	requestCount := 0
@@ -19,12 +19,8 @@ func TestCheckerChannelsAndCommitAncestry(t *testing.T) {
 		requestCount++
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.URL.Path == "/releases/tags/edge":
-			fmt.Fprintf(w, `{"id":1,"tag_name":"edge","target_commitish":%q,"assets":[{"id":1,"name":"frp-panel-linux-amd64"}]}`, newCommit)
 		case r.URL.Path == "/releases/latest":
 			fmt.Fprintf(w, `{"id":2,"tag_name":"v1.2.0","target_commitish":%q,"assets":[{"id":1,"name":"frp-panel-linux-amd64"}]}`, newCommit)
-		case r.URL.Path == "/compare/"+oldCommit+"..."+newCommit:
-			fmt.Fprint(w, `{"status":"ahead"}`)
 		default:
 			http.NotFound(w, r)
 		}
@@ -36,9 +32,10 @@ func TestCheckerChannelsAndCommitAncestry(t *testing.T) {
 		name, version, commit, channel string
 		available                      *bool
 	}{
-		{"edge older", "edge-SNAPSHOT", oldCommit, "edge", boolPointer(true)},
-		{"edge same", "main", newCommit, "edge", boolPointer(false)},
+		{"edge legacy", "edge-SNAPSHOT", oldCommit, "legacy", nil},
+		{"main legacy", "main", newCommit, "legacy", nil},
 		{"stable older", "v1.1.0", oldCommit, "stable", boolPointer(true)},
+		{"stable same", "v1.2.0", newCommit, "stable", boolPointer(false)},
 		{"stable newer", "v1.3.0", oldCommit, "stable", boolPointer(false)},
 		{"development", "dev", oldCommit, "unknown", nil},
 	} {
@@ -53,8 +50,31 @@ func TestCheckerChannelsAndCommitAncestry(t *testing.T) {
 		})
 	}
 	_, _ = checker.Check(context.Background(), conf.VersionInfo{GitVersion: "edge-SNAPSHOT", GitCommit: oldCommit}, false)
-	if requestCount != 3 { // one fetch per channel and one ancestry check
+	if requestCount != 1 {
 		t.Fatalf("expected cached release metadata; got %d HTTP requests", requestCount)
+	}
+}
+
+func TestCheckerRejectsReusedOrPrereleaseTags(t *testing.T) {
+	oldCommit := strings.Repeat("a", 40)
+	newCommit := strings.Repeat("b", 40)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"id":2,"tag_name":"v1.2.0","target_commitish":%q,"assets":[{"id":1,"name":"frp-panel-linux-amd64"}]}`, newCommit)
+	}))
+	defer server.Close()
+	checker := NewChecker()
+	checker.BaseURL = server.URL
+	snapshot, _ := checker.Check(context.Background(), conf.VersionInfo{GitVersion: "v1.2.0", GitCommit: oldCommit}, false)
+	if snapshot.Available != nil || !strings.Contains(snapshot.Error, "different commit") {
+		t.Fatalf("reused tag must not be updatable: %+v", snapshot)
+	}
+	server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"id":2,"tag_name":"v1.3.0","draft":true,"target_commitish":%q,"assets":[{"id":1,"name":"frp-panel-linux-amd64"}]}`, newCommit)
+	})
+	checker = NewChecker()
+	checker.BaseURL = server.URL
+	if _, err := checker.Latest(context.Background(), "stable", false); err == nil {
+		t.Fatal("draft release must be rejected")
 	}
 }
 

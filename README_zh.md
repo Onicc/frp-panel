@@ -49,8 +49,8 @@ go build ./cmd/frpp ./cmd/frp-panel-agent
 
 ## 发布规则
 
-- `main` 通过测试后更新 GitHub `edge` 发布及两个 Docker 镜像的 `edge` 标签。
-- `v*` 标签生成稳定 GitHub Release，并发布对应版本与 `latest` 镜像。
+- `main` 仅运行 CI，不再发布滚动的 `edge`；现有 `edge` 部署需要一次手动迁移。
+- 精确的 `vX.X.X` 标签在验证后发布 GitHub 正式版、同版本 Docker 镜像和 `latest` 别名。Master 与 Server 应固定相同版本。
 - 发布物带校验和、SBOM 与 GitHub 构建证明；目前不提供 Apple 公证及 Windows Authenticode。
 
 ## 开源协议与署名

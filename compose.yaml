@@ -1,6 +1,6 @@
 services:
   master:
-    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:edge}
+    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:v2.1.0}
     restart: unless-stopped
     environment:
       APP_GLOBAL_SECRET: ${APP_GLOBAL_SECRET:?set a random 32+ character secret}

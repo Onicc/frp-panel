@@ -49,8 +49,8 @@ See [architecture](docs/ARCHITECTURE_V2.md), [optimization review](docs/OPTIMIZA
 
 ## Releases
 
-- Every successful `main` push updates the `edge` binaries and the `edge` tags on both Docker images.
-- A `v*` tag creates a stable GitHub release and publishes that tag plus `latest` to Docker Hub.
+- `main` runs CI but no longer publishes rolling `edge` builds. Existing `edge` installations require a one-time manual migration.
+- An exact `vX.X.X` tag creates a stable GitHub release and publishes matching Docker images plus a `latest` alias after validation. Pin the same version for Master and Servers.
 - Stable releases include checksums, SBOMs, and GitHub artifact attestations. Apple notarization and Windows Authenticode are not currently provided.
 
 ## License and attribution

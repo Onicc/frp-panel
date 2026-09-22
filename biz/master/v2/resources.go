@@ -20,6 +20,7 @@ import (
 	"github.com/Onicc/frp-panel/common"
 	"github.com/Onicc/frp-panel/conf"
 	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/internal/release"
 	"github.com/Onicc/frp-panel/models"
 	"github.com/Onicc/frp-panel/pb"
 	"github.com/Onicc/frp-panel/services/app"
@@ -1411,6 +1412,10 @@ func tunnelToResource(appInstance app.Application, db *gorm.DB, item *models.Pro
 }
 
 func makeEnrollment(appInstance app.Application, id, kind string, serverAPIPort int, token string, expires time.Time) enrollmentPayload {
+	return makeEnrollmentForVersion(appInstance, id, kind, serverAPIPort, token, expires, conf.GetVersion().GitVersion)
+}
+
+func makeEnrollmentForVersion(appInstance app.Application, id, kind string, serverAPIPort int, token string, expires time.Time, runningVersion string) enrollmentPayload {
 	cfg := appInstance.GetConfig()
 	apiURL := conf.GetAPIURL(cfg)
 	rpcURL := cfg.Client.RPCUrl
@@ -1418,17 +1423,25 @@ func makeEnrollment(appInstance app.Application, id, kind string, serverAPIPort 
 		rpcURL = apiURL
 	}
 	p := enrollmentPayload{Token: token, ExpiresAt: expires, APIURL: apiURL, RPCURL: rpcURL}
+	version := runningVersion
+	if release.Channel(version) != "stable" {
+		version = "latest"
+	}
 	if kind == "client" {
 		p.ClientID = id
 		base := strings.TrimRight(cfg.App.AgentInstallURL, "/")
-		if base == "" {
-			base = "https://raw.githubusercontent.com/Onicc/frp-panel/main"
+		if base == "" || base == "https://raw.githubusercontent.com/Onicc/frp-panel/main" {
+			ref := "main"
+			if version != "latest" {
+				ref = version
+			}
+			base = "https://raw.githubusercontent.com/Onicc/frp-panel/" + ref
 		}
 		args := fmt.Sprintf("--client-id %s --enrollment-token %s --api-url %s --rpc-url %s", shellQuote(id), shellQuote(token), shellQuote(apiURL), shellQuote(rpcURL))
 		p.InstallCommands = map[string]string{
-			"linux":   fmt.Sprintf("curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 %s | sudo bash -s -- %s", shellQuote(base+"/install.sh"), args),
-			"darwin":  fmt.Sprintf("curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 %s | sudo bash -s -- %s", shellQuote(base+"/install.sh"), args),
-			"windows": powershellInstallCommand(base, id, token, apiURL, rpcURL),
+			"linux":   fmt.Sprintf("curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 %s | sudo bash -s -- --version %s %s", shellQuote(base+"/install.sh"), shellQuote(version), args),
+			"darwin":  fmt.Sprintf("curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 %s | sudo bash -s -- --version %s %s", shellQuote(base+"/install.sh"), shellQuote(version), args),
+			"windows": powershellInstallCommand(base, version, id, token, apiURL, rpcURL),
 		}
 		// Keep the Linux command as a compatibility field for existing clients.
 		p.InstallCommand = p.InstallCommands["linux"]
@@ -1437,9 +1450,13 @@ func makeEnrollment(appInstance app.Application, id, kind string, serverAPIPort 
 		if serverAPIPort == 0 {
 			serverAPIPort = defs.DefaultServerAPIPort
 		}
+		image := "${FRP_PANEL_IMAGE:?set FRP_PANEL_IMAGE to a tested vX.X.X image}"
+		if version != "latest" {
+			image = "${FRP_PANEL_IMAGE:-onicc/frp-panel:" + version + "}"
+		}
 		p.ComposeYAML = fmt.Sprintf(`services:
   frps:
-    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:edge}
+    image: %s
     restart: unless-stopped
     network_mode: host
     command: ["server", "--config", "/data/server.yaml"]
@@ -1452,7 +1469,7 @@ func makeEnrollment(appInstance app.Application, id, kind string, serverAPIPort 
 
 volumes:
   frp-panel-server-data:
-`, apiURL, token, strconv.Itoa(serverAPIPort))
+`, image, apiURL, token, strconv.Itoa(serverAPIPort))
 	}
 	return p
 }
@@ -1468,14 +1485,14 @@ func powershellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
 }
 
-func powershellInstallCommand(base, id, token, apiURL, rpcURL string) string {
+func powershellInstallCommand(base, version, id, token, apiURL, rpcURL string) string {
 	args := []string{
 		"'--client-id'", powershellQuote(id),
 		"'--enrollment-token'", powershellQuote(token),
 		"'--api-url'", powershellQuote(apiURL),
 		"'--rpc-url'", powershellQuote(rpcURL),
 	}
-	return fmt.Sprintf("powershell -NoProfile -ExecutionPolicy Bypass -Command \"$p = Join-Path $env:TEMP ('frp-panel-install-' + [guid]::NewGuid().ToString('N') + '.ps1'); try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri %s -OutFile $p; & $p -AgentArguments @(%s); if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } } finally { Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue }\"", powershellQuote(strings.TrimRight(base, "/")+"/install.ps1"), strings.Join(args, ", "))
+	return fmt.Sprintf("powershell -NoProfile -ExecutionPolicy Bypass -Command \"$p = Join-Path $env:TEMP ('frp-panel-install-' + [guid]::NewGuid().ToString('N') + '.ps1'); try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri %s -OutFile $p; & $p -Version %s -AgentArguments @(%s); if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } } finally { Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue }\"", powershellQuote(strings.TrimRight(base, "/")+"/install.ps1"), powershellQuote(version), strings.Join(args, ", "))
 }
 
 // reconcileTunnel is deliberately best-effort. Desired state is durable and

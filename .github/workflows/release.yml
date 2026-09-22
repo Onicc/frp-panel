@@ -2,9 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,13 +12,23 @@ permissions:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+  cancel-in-progress: false
 
 jobs:
   verify:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify immutable release version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          test "$RELEASE_TAG" = "v$(jq -r .version www/package.json)"
+          grep -Fq "onicc/frp-panel:$RELEASE_TAG" compose.yaml
+          grep -Fq "onicc/frp-panel:$RELEASE_TAG" docs/deployment.md
+          grep -Fq "onicc/frp-panel:$RELEASE_TAG" docs/en/deployment.md
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with: { version: 10.17.1 }
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -37,13 +45,17 @@ jobs:
           pnpm test:e2e
           pnpm audit --prod --audit-level high
           pnpm build
+      - name: Documentation build
+        working-directory: docs
+        run: pnpm install --frozen-lockfile && pnpm docs:build
       - name: Go quality gates
         run: |
-          go test ./...
+          go test -race ./...
           go vet ./...
           go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...
           go run github.com/securego/gosec/v2/cmd/gosec@v2.29.0 -quiet -exclude-generated -exclude=G104,G115,G204,G301,G302,G304,G122 ./...
           go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+          test -z "$(gofmt -l -- .)"
 
   binaries:
     needs: verify
@@ -64,17 +76,7 @@ jobs:
       - name: Build web console
         working-directory: www
         run: pnpm install --frozen-lockfile && pnpm build
-      - name: Build rolling edge binaries
-        if: github.ref == 'refs/heads/main'
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
-        with:
-          distribution: goreleaser
-          version: '~> v2'
-          args: release --clean --snapshot
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish tagged binaries
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Stage tagged binaries in a draft release
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         with:
           distribution: goreleaser
@@ -98,40 +100,6 @@ jobs:
         with:
           name: release-binaries
           path: dist/upload/*
-      - name: Publish rolling edge release
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          release_notes="Automated build from main at $GITHUB_SHA"
-          max_attempts=2
-          cleanup_timeout=2m
-          upload_timeout=25m
-
-          for attempt in 1 2; do
-            # Replacing a rolling release is not atomic. Clean up both the
-            # release and an orphaned edge tag before retrying creation.
-            timeout --foreground "$cleanup_timeout" \
-              gh release delete edge --yes --cleanup-tag >/dev/null 2>&1 || true
-            timeout --foreground "$cleanup_timeout" \
-              gh api --method DELETE "repos/Onicc/frp-panel/git/refs/tags/edge" >/dev/null 2>&1 || true
-
-            if timeout --foreground --kill-after=30s "$upload_timeout" \
-              gh release create edge --target "$GITHUB_SHA" dist/upload/* \
-              --prerelease --title "edge" --notes "$release_notes"; then
-              exit 0
-            fi
-
-            if (( attempt < max_attempts )); then
-              echo "Rolling edge release publish failed or timed out; retrying in 15 seconds (attempt $(( attempt + 1 ))/$max_attempts)" >&2
-              sleep 15
-            fi
-          done
-
-          echo "Failed to publish rolling edge release after $max_attempts attempts" >&2
-          exit 1
-
   images:
     needs: verify
     runs-on: ubuntu-24.04
@@ -162,8 +130,7 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.target }}
           cache-to: type=gha,mode=max,scope=${{ matrix.target }}
           tags: |
-            ${{ matrix.image }}:${{ github.ref == 'refs/heads/main' && 'edge' || github.ref_name }}
-            ${{ startsWith(github.ref, 'refs/tags/v') && format('{0}:latest', matrix.image) || '' }}
+            ${{ matrix.image }}:${{ github.ref_name }}
           build-args: |
             VERSION=${{ github.ref_name }}
             COMMIT=${{ github.sha }}
@@ -172,3 +139,42 @@ jobs:
           subject-name: index.docker.io/${{ matrix.image }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
+
+  publish:
+    needs: [binaries, images]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Verify release assets and matching multi-platform images
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh api "repos/Onicc/frp-panel/releases/tags/$RELEASE_TAG" --jq '.draft and (.assets | length >= 17)' | grep -Fxq true
+          mkdir -p release-assets
+          gh release download "$RELEASE_TAG" --repo Onicc/frp-panel --dir release-assets
+          (cd release-assets && sha256sum -c checksums.txt)
+          chmod +x release-assets/frp-panel-linux-amd64 release-assets/frp-panel-agent-linux-amd64
+          release-assets/frp-panel-linux-amd64 version | grep -Fx "BinVersion: $RELEASE_TAG"
+          release-assets/frp-panel-agent-linux-amd64 version | grep -Fx "BinVersion: $RELEASE_TAG"
+          for image in onicc/frp-panel onicc/frp-panel-agent; do
+            docker buildx imagetools inspect "$image:$RELEASE_TAG" | grep -Fq 'linux/amd64'
+            docker buildx imagetools inspect "$image:$RELEASE_TAG" | grep -Fq 'linux/arm64'
+          done
+          docker run --rm --entrypoint /usr/local/bin/frp-panel "onicc/frp-panel:$RELEASE_TAG" version | grep -Fx "BinVersion: $RELEASE_TAG"
+          docker run --rm "onicc/frp-panel-agent:$RELEASE_TAG" version | grep -Fx "BinVersion: $RELEASE_TAG"
+      - name: Promote verified stable images and publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          for image in onicc/frp-panel onicc/frp-panel-agent; do
+            docker buildx imagetools create --tag "$image:latest" "$image:$RELEASE_TAG"
+          done
+          gh release edit "$RELEASE_TAG" --repo Onicc/frp-panel --draft=false --latest

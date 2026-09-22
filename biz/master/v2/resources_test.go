@@ -428,4 +428,38 @@ func TestEnrollmentIncludesSafeCrossPlatformInstallCommands(t *testing.T) {
 	if !strings.Contains(payload.InstallCommands["windows"], "install.ps1") || !strings.Contains(payload.InstallCommands["windows"], "--client-id") {
 		t.Fatalf("windows command is incomplete: %s", payload.InstallCommands["windows"])
 	}
+	if !strings.Contains(payload.InstallCommands["linux"], "--version 'latest'") || !strings.Contains(payload.InstallCommands["windows"], "-Version 'latest'") {
+		t.Fatalf("development enrollment must use explicit latest version: %#v", payload.InstallCommands)
+	}
+}
+
+func TestStableEnrollmentPinsScriptsImagesAndBinaryVersion(t *testing.T) {
+	a := app.NewApp()
+	cfg := conf.DefaultConfig()
+	cfg.PublicURL = "https://panel.example.test"
+	cfg.Client.RPCUrl = "wss://panel.example.test"
+	a.SetConfig(cfg)
+	expires := time.Now().UTC().Add(time.Minute)
+	client := makeEnrollmentForVersion(a, "owner.c.mac", "client", 0, "token", expires, "v2.1.0")
+	for _, platform := range []string{"linux", "darwin", "windows"} {
+		command := client.InstallCommands[platform]
+		if !strings.Contains(command, "/v2.1.0/install.") {
+			t.Fatalf("%s script is not pinned: %s", platform, command)
+		}
+		if platform == "windows" {
+			if !strings.Contains(command, "-Version 'v2.1.0'") {
+				t.Fatalf("Windows binary is not pinned: %s", command)
+			}
+		} else if !strings.Contains(command, "--version 'v2.1.0'") {
+			t.Fatalf("%s binary is not pinned: %s", platform, command)
+		}
+	}
+	server := makeEnrollmentForVersion(a, "owner.s.sg", "server", 8999, "token", expires, "v2.1.0")
+	if !strings.Contains(server.ComposeYAML, "${FRP_PANEL_IMAGE:-onicc/frp-panel:v2.1.0}") {
+		t.Fatalf("server image is not pinned: %s", server.ComposeYAML)
+	}
+	legacy := makeEnrollmentForVersion(a, "owner.s.sg", "server", 8999, "token", expires, "edge-SNAPSHOT")
+	if !strings.Contains(legacy.ComposeYAML, "${FRP_PANEL_IMAGE:?set FRP_PANEL_IMAGE") {
+		t.Fatalf("legacy master must require an explicit image: %s", legacy.ComposeYAML)
+	}
 }

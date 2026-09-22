@@ -253,7 +253,7 @@ func newUpdateCommand() *cobra.Command {
 				agentservice.Control)
 		},
 	}
-	cmd.Flags().StringVar(&version, "version", "edge", "release tag or latest stable version")
+	cmd.Flags().StringVar(&version, "version", "latest", "stable release tag or latest stable version")
 	cmd.Flags().BoolVar(&restart, "restart-service", true, "restart service after a successful replacement")
 	return cmd
 }

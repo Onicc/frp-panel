@@ -64,10 +64,11 @@
             <td><StatusBadge :status="item.status" /></td>
             <td>
               <div class="version-cell">
-                <span class="mono">{{ formatVersion(item.version) }}</span>
+                <span class="mono" :title="displayVersionDetails(item.version?.gitVersion, item.version?.gitCommit, versionLabels)">{{ formatVersion(item.version) }}</span>
                 <button v-if="hasUpdate(item) && canManageUpdates" class="text-button version-new" type="button" @click="openUpdate(item)">{{ t('updates.newVersion') }}</button>
                 <span v-else-if="hasUpdate(item)" class="version-auto-tag">{{ t('updates.newVersion') }}</span>
-                <span v-if="item.autoUpdate" class="version-auto-tag">{{ t('updates.auto') }}</span>
+                <button v-else-if="hasMigration(item) && canManageUpdates" class="text-button version-new" type="button" @click="openMigration(item)">{{ t('updates.migration') }}</button>
+                <span v-if="item.autoUpdate" class="version-auto-tag">{{ versionChannel(item.version) === 'legacy' ? t('updates.autoPaused') : t('updates.auto') }}</span>
                 <span v-if="item.updateOperation" class="field-hint" role="status" :title="item.updateOperation.error || undefined">{{ t(`updates.states.${item.updateOperation.state}`) }}{{ item.updateOperation.error ? `: ${item.updateOperation.error}` : '' }}</span>
               </div>
             </td>
@@ -164,6 +165,11 @@
       </template>
     </BaseDialog>
     <ConfirmDialog :show="dialog === 'update'" :title="t('updates.serverTitle')" :message="t('updates.serverDowntime')" :error="modalError" :busy="busy" @cancel="closeDialog" @confirm="startUpdate" />
+    <BaseDialog :show="dialog === 'migration'" :title="t('updates.migration')" @close="closeDialog">
+      <p class="dialog-copy">{{ t('updates.serverMigration') }}</p>
+      <div class="code-block"><pre><code>{{ migrationInstructions }}</code></pre></div>
+      <template #footer><button class="button secondary" type="button" @click="closeDialog">{{ t('common.close') }}</button><button class="button primary" type="button" @click="copy(migrationInstructions)"><Icon name="copy" size="xs" />{{ t('common.copy') }}</button></template>
+    </BaseDialog>
   </section>
 </template>
 
@@ -179,6 +185,7 @@ import { api, APIError, type ReleaseSnapshot, type Server, type VersionInfo } fr
 import { useToastStore } from '../stores/toast'
 import { useAutoRefresh } from '../composables/useAutoRefresh'
 import { cachedRelease, hasNewRelease, loadRelease, versionChannel } from '../composables/useReleaseInfo'
+import { displayVersion, displayVersionDetails } from '../composables/displayVersion'
 import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
@@ -194,19 +201,23 @@ const total    = ref(0)
 const search       = ref('')
 const stateFilter  = ref('')
 const statusFilter = ref('')
-const dialog   = ref<'create'|'edit'|'rotate'|'delete'|'policy'|'update'|''>('')
-const releases = ref<Partial<Record<'edge'|'stable', ReleaseSnapshot>>>({})
+const dialog   = ref<'create'|'edit'|'rotate'|'delete'|'policy'|'update'|'migration'|''>('')
+const releases = ref<Partial<Record<'stable', ReleaseSnapshot>>>({})
 const policy = reactive({ enabled: false, timeZone: 'UTC', windowStart: '03:00', windowEnd: '04:00' })
-const formatVersion = (version?: VersionInfo) => version ? `${version.gitVersion === 'main' ? 'edge' : version.gitVersion} · ${version.gitCommit.slice(0, 7)}` : '—'
+const versionLabels = computed(() => ({ legacy: t('updates.legacyVersion'), development: t('updates.developmentVersion') }))
+const formatVersion = (version?: VersionInfo) => displayVersion(version?.gitVersion, versionLabels.value)
 const hasUpdate = (item: Server) => {
   const channel = versionChannel(item.version)
-  return channel && hasNewRelease(item.version, releases.value[channel] || cachedRelease(channel)) === true
+  return channel === 'stable' && hasNewRelease(item.version, releases.value.stable || cachedRelease('stable')) === true
 }
+const hasMigration = (item: Server) => versionChannel(item.version) === 'legacy' && !!releases.value.stable?.latestVersion && !releases.value.stable?.error
+const migrationInstructions = computed(() => `# .env\nFRP_PANEL_IMAGE=onicc/frp-panel:${releases.value.stable?.latestVersion || ''}\n\ndocker compose pull frps\ndocker compose up -d frps`)
 const openPolicy = (item: Server) => { selected.value = item; modalError.value = ''; policy.enabled = item.autoUpdate; policy.timeZone = item.updateZone || 'UTC'; policy.windowStart = item.updateStart || '03:00'; policy.windowEnd = item.updateEnd || '04:00'; dialog.value = 'policy' }
 const openUpdate = (item: Server) => { selected.value = item; modalError.value = ''; dialog.value = 'update' }
+const openMigration = (item: Server) => { selected.value = item; dialog.value = 'migration' }
 const refreshReleases = async (items: Server[]) => {
-  for (const channel of new Set(items.map((item) => versionChannel(item.version)).filter((value): value is 'edge'|'stable' => value !== null))) {
-    try { releases.value[channel] = await loadRelease(channel) } catch { /* status remains unknown */ }
+  if (items.some((item) => versionChannel(item.version))) {
+    try { releases.value.stable = await loadRelease('stable') } catch { /* status remains unknown */ }
   }
 }
 const selected = ref<Server>()

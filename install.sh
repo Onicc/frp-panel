@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repository="Onicc/frp-panel"
-version="edge"
+version="latest"
 github_proxy=""
 agent_args=()
 
@@ -24,6 +24,11 @@ while (($#)); do
       ;;
   esac
 done
+
+if [[ "$version" != "latest" && ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "--version must be latest or a stable vX.X.X release; edge is retired" >&2
+  exit 2
+fi
 
 case "$(uname -s)" in
   Linux) asset_os="linux" ;;
@@ -55,14 +60,7 @@ checksum="$temp_dir/checksums.txt"
 download_release_asset() {
   local url="$1"
   local output="$2"
-  local attempts=1
-
-  # The rolling edge release is replaced by CI. During that short window the
-  # old release may already be gone while the new assets are not available
-  # yet, so retry the complete asset download instead of failing on a 404.
-  if [[ "$version" == "edge" ]]; then
-    attempts=6
-  fi
+  local attempts=3
 
   while (( attempts > 0 )); do
     if curl --fail --location --proto '=https' --tlsv1.2 --retry 3 \

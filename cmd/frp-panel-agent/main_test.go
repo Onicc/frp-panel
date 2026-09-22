@@ -28,7 +28,7 @@ func TestAgentUpdateRestartModesWithoutTouchingLocalService(t *testing.T) {
 	} {
 		calls := 0
 		start := func(_ context.Context, options upgrade.Options) error {
-			if options.Version != "edge" || options.RestartService != tc.libraryRestart || !options.Backup {
+			if options.Version != "v2.1.0" || options.RestartService != tc.libraryRestart || !options.Backup {
 				t.Fatalf("unexpected options: %+v", options)
 			}
 			return nil
@@ -40,7 +40,7 @@ func TestAgentUpdateRestartModesWithoutTouchingLocalService(t *testing.T) {
 			calls++
 			return nil
 		}
-		if err := runAgentUpdate(context.Background(), "edge", tc.restart, tc.goos, start, control); err != nil {
+		if err := runAgentUpdate(context.Background(), "v2.1.0", tc.restart, tc.goos, start, control); err != nil {
 			t.Fatal(err)
 		}
 		if calls != tc.nativeCalls {
@@ -48,7 +48,7 @@ func TestAgentUpdateRestartModesWithoutTouchingLocalService(t *testing.T) {
 		}
 	}
 	controlCalled := false
-	err := runAgentUpdate(context.Background(), "edge", true, "darwin", func(context.Context, upgrade.Options) error { return errors.New("download failed") }, func(string) error { controlCalled = true; return nil })
+	err := runAgentUpdate(context.Background(), "v2.1.0", true, "darwin", func(context.Context, upgrade.Options) error { return errors.New("download failed") }, func(string) error { controlCalled = true; return nil })
 	if err == nil || controlCalled {
 		t.Fatal("failed download must never restart the service")
 	}

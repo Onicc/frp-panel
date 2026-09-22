@@ -1,13 +1,16 @@
 #Requires -Version 5.1
 [CmdletBinding()]
 param(
-    [string]$Version = "edge",
+    [string]$Version = "latest",
     [string]$GitHubProxy = "",
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$AgentArguments
 )
 
 $ErrorActionPreference = "Stop"
+if ($Version -ne "latest" -and $Version -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+    throw "Version must be latest or a stable vX.X.X release; edge is retired"
+}
 $repository = "Onicc/frp-panel"
 $architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
 switch ($architecture) {

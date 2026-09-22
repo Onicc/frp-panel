@@ -2,8 +2,11 @@ package upgrade
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
+
+var stableReleaseTag = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+$`)
 
 func buildDownloadURL(opt Options) (string, error) {
 	if u := strings.TrimSpace(opt.DownloadURL); len(u) > 0 {
@@ -12,6 +15,9 @@ func buildDownloadURL(opt Options) (string, error) {
 	version := strings.TrimSpace(opt.Version)
 	if len(version) == 0 {
 		version = "latest"
+	}
+	if version != "latest" && !stableReleaseTag.MatchString(version) {
+		return "", fmt.Errorf("version must be latest or a stable vX.X.X release")
 	}
 
 	asset, err := detectAssetName()

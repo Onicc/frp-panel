@@ -1,5 +1,12 @@
 version: 2
 
+git:
+  ignore_tags:
+    - edge
+
+release:
+  draft: true
+
 builds:
   - id: controller
     main: ./cmd/frpp
@@ -9,7 +16,7 @@ builds:
     goarch: [amd64, arm64]
     ldflags:
       - -s -w
-      - -X github.com/Onicc/frp-panel/conf.gitVersion={{.Version}}
+      - -X github.com/Onicc/frp-panel/conf.gitVersion={{.Tag}}
       - -X github.com/Onicc/frp-panel/conf.gitCommit={{.Commit}}
       - -X github.com/Onicc/frp-panel/conf.buildDate={{.Date}}
   - id: agent
@@ -20,7 +27,7 @@ builds:
     goarch: [amd64, arm64]
     ldflags:
       - -s -w
-      - -X github.com/Onicc/frp-panel/conf.gitVersion={{.Version}}
+      - -X github.com/Onicc/frp-panel/conf.gitVersion={{.Tag}}
       - -X github.com/Onicc/frp-panel/conf.gitCommit={{.Commit}}
       - -X github.com/Onicc/frp-panel/conf.buildDate={{.Date}}
 

@@ -18,7 +18,7 @@
 sudo systemctl status frp-panel-agent
 sudo systemctl restart frp-panel-agent
 sudo /usr/local/libexec/frp-panel/frp-panel-agent doctor --json
-sudo /usr/local/libexec/frp-panel/frp-panel-agent update --version edge
+sudo /usr/local/libexec/frp-panel/frp-panel-agent update --version v2.1.0
 sudo /usr/local/libexec/frp-panel/frp-panel-agent service uninstall --purge
 ```
 
@@ -26,7 +26,7 @@ sudo /usr/local/libexec/frp-panel/frp-panel-agent service uninstall --purge
 sudo launchctl print system/io.github.onicc.frp-panel.agent
 sudo /usr/local/libexec/frp-panel/frp-panel-agent service restart
 sudo /usr/local/libexec/frp-panel/frp-panel-agent doctor --json
-sudo /usr/local/libexec/frp-panel/frp-panel-agent update --version edge --restart-service=false && sudo /usr/local/libexec/frp-panel/frp-panel-agent service restart
+sudo /usr/local/libexec/frp-panel/frp-panel-agent update --version v2.1.0 --restart-service=false && sudo /usr/local/libexec/frp-panel/frp-panel-agent service restart
 sudo /usr/local/libexec/frp-panel/frp-panel-agent service uninstall --purge
 ```
 
@@ -34,7 +34,7 @@ sudo /usr/local/libexec/frp-panel/frp-panel-agent service uninstall --purge
 Get-Service frp-panel-agent
 Restart-Service frp-panel-agent
 & "$env:ProgramFiles\frp-panel\frp-panel-agent.exe" doctor --json
-& "$env:ProgramFiles\frp-panel\frp-panel-agent.exe" update --version edge
+& "$env:ProgramFiles\frp-panel\frp-panel-agent.exe" update --version v2.1.0
 & "$env:ProgramFiles\frp-panel\frp-panel-agent.exe" service uninstall --purge
 ```
 
@@ -54,6 +54,6 @@ curl -fsSL https://raw.githubusercontent.com/Onicc/frp-panel/main/install.sh | s
 
 macOS 尚未进行 Apple 公证，Windows 尚未提供 Authenticode 签名。稳定部署前请依据 GitHub Release 的 `checksums.txt` 验证下载内容。
 
-引导脚本和 `update` 默认跟随滚动的 `edge` 发布；生产环境应显式传入经过评估的 `v*` 标签，或使用 `--version latest` 选择最新稳定版本。
+引导脚本和 `update` 默认选择最新正式版；控制台生成的安装命令会指定与 Master 相同的 `vX.X.X`。以上示例的 `v2.1.0` 是首次正式版，后续请从 Clients 页复制对应机器的实际目标版本命令。旧 `edge` Agent 可使用同一命令一次性迁移；执行前请备份本机配置，不要删除原有服务数据。
 
 Master、独立 Server、Client 与 Tunnel 的完整上线顺序见 [部署指南](/deployment)。

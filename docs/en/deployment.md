@@ -21,7 +21,7 @@ Keep `compose.yaml` and `.env` in a dedicated directory. The repository [compose
 ```yaml
 services:
   master:
-    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:edge}
+    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:v2.1.0}
     restart: unless-stopped
     environment:
       APP_GLOBAL_SECRET: ${APP_GLOBAL_SECRET:?set a random 32+ character secret}
@@ -46,7 +46,7 @@ volumes:
 ### .env
 
 ```dotenv
-FRP_PANEL_IMAGE=onicc/frp-panel:edge
+FRP_PANEL_IMAGE=onicc/frp-panel:v2.1.0
 
 APP_GLOBAL_SECRET=REPLACE_WITH_A_RANDOM_32_BYTE_OR_LONGER_SECRET
 APP_COOKIE_SECURE=true
@@ -62,7 +62,7 @@ PUBLIC_URL=https://panel.example.com
 - `PUBLIC_URL` is the only Master public address to configure. It must be a complete `http://` or `https://` URL without a path; HTTPS automatically derives the `wss://` RPC endpoint.
 - Set `APP_AGENT_INSTALL_URL` only for a fork or internal mirror; it must contain both `install.sh` and `install.ps1`.
 - In production with `APP_COOKIE_SECURE=true`, an HTTPS reverse proxy must forward Web, API, and WebSocket traffic to `127.0.0.1:9000`; the repository Compose file does not provide public TLS.
-- Pin a tested `v*` image tag in production; `edge` follows `main`.
+- The rolling `edge` release is retired. Pin the same tested `vX.X.X` image for Master and Servers; `latest` is a mutable alias of the latest stable release.
 
 Master does not publish port `7000` or any tunnel remote port.
 
@@ -87,7 +87,7 @@ The generated file has this structure. Master inserts its configured `PUBLIC_URL
 ```yaml
 services:
   frps:
-    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:edge}
+    image: ${FRP_PANEL_IMAGE:-onicc/frp-panel:v2.1.0}
     restart: unless-stopped
     network_mode: host
     command:
@@ -144,11 +144,17 @@ The map uses a manually set public IP in Client editing first, a recent direct A
 
 ## 6. Version checks and updates
 
-The top-left Master badge shows the installed version and newer GitHub releases in the same channel. **Pull and redeploy an image containing the update launcher once before using Web updates**; setting an environment variable on an old image is insufficient. The Owner may then update Master manually. The official binary is staged on the existing `/data` volume and checked against `checksums.txt`, architecture, and commit before the container launcher restarts it. A failed startup falls back to the image or previous verified binary. Web/API may briefly disconnect. The Web action does not replace the Docker image: after a later image pull/redeploy, the new image takes precedence over the old volume overlay. Back up the volume first and keep Master/Server images compatible.
+Stable builds show their actual `vX.X.X` version, with a short commit on hover. Old `edge` nodes display “Legacy build” rather than an invented stable version; development builds are also identified separately.
 
-The Servers list shows each Server's reported version. Administrators may update manually or opt in to automatic updates with an IANA time zone and same-day maintenance window (default `UTC 03:00–04:00`). Automatic updates are off by default, attempt at most once per Server per day in the window, and stay on that Server's `edge` or stable channel. Tunnels may briefly disconnect. The UI distinguishes download, verification, restart, success, and rollback. Each Server also needs one initial image redeploy with its existing `/data` volume. Offline Servers, unknown versions, or unverifiable releases are not updated.
+The top-left Master badge shows the installed version and the latest stable GitHub release. **Pull and redeploy an image containing the update launcher once before using Web updates**; setting an environment variable on an old image is insufficient. The Owner may then update Master manually. The official binary is staged on the existing `/data` volume and checked against `checksums.txt`, architecture, and commit before the container launcher restarts it. A failed startup falls back to the image or previous verified binary. Web/API may briefly disconnect. The Web action does not replace the Docker image: after a later image pull/redeploy, the new image takes precedence over the old volume overlay. Back up the volume first and keep Master/Server images compatible.
+
+The Servers list shows each Server's reported version. Administrators may update manually or opt in to automatic updates with an IANA time zone and same-day maintenance window (default `UTC 03:00–04:00`). Automatic updates are off by default and only track stable releases. Auto-update is paused for legacy `edge` Servers until their image is manually migrated; the saved policy then resumes. Tunnels may briefly disconnect. The UI distinguishes download, verification, restart, success, and rollback. Each Server also needs one initial image redeploy with its existing `/data` volume. Offline Servers, unknown versions, or unverifiable releases are not updated.
 
 Clients only report their version. When a newer release exists, copy the OS-specific command from the version badge and run it locally on the target host; the console does not remotely update or restart Clients. For old macOS Agents the command separates binary replacement and native LaunchDaemon restart. Verify that the version refreshes and the Agent remains online. Manual Docker updates remain available with `docker compose pull && docker compose up -d` in the original Compose directory; do not remove volumes.
+
+### One-time migration from `edge` to `v2.1.0`
+
+Confirm the [v2.1.0 Release](https://github.com/Onicc/frp-panel/releases/tag/v2.1.0) and both Docker images exist, then back up the Master and Server data volumes. Migrate Master, then Servers, then Clients: pin `FRP_PANEL_IMAGE=onicc/frp-panel:v2.1.0` on each Docker host and run `docker compose pull` followed by `docker compose up -d` without deleting volumes. Copy each Client's OS-specific `--version v2.1.0` command from the console; macOS uses a separate native service restart. Verify node status and existing TCP/UDP Tunnels after each step. In-panel updates change the running binary, not the pinned Compose image; advance the image baseline at subsequent maintenance to avoid reverting on image recreation.
 
 ## 7. Ports and acceptance
 
