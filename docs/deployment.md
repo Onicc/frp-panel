@@ -161,7 +161,15 @@ Client 上线后无需预先绑定 Server。打开 **Tunnels → 创建 Tunnel**
 
 首页地图优先使用 Client 编辑页手工指定的公网 IP，其次使用 Client Agent 最近 24 小时的直连探测 IP，最后使用 Master 观察到的连接 IP。Agent 直连探测会绕过 `HTTP_PROXY`/`HTTPS_PROXY`，但透明代理或 TUN 模式仍可能影响结果；此时请在 Client 编辑页填写实际公网 IP。回退到 Master 观察值时，地图会明确标注“可能为代理出口”。升级已有部署以启用这些修复时，需同时更新 Master、Server 和 Client Agent；仅更新 Web 页面不足以清除 Agent 旧连接。
 
-## 6. 网络端口
+## 6. 版本检查与升级
+
+Master 左上角显示当前版本和同一发布通道的 GitHub 新版本。首次使用网页升级前，**必须先拉取并重新部署一次含更新启动器的镜像**；旧镜像不能仅凭设置环境变量获得该能力。之后 Owner 可在左上角手动升级 Master。升级包下载到原有 `/data` 卷，校验官方 `checksums.txt`、平台和提交版本后由容器内启动器重启；新进程未能健康启动会回退到镜像或上一个已验证版本。更新期间 Web/API 短暂不可用，浏览器会继续查询任务结果。Docker 镜像本身不会被网页升级；重新拉取新镜像并部署后，新镜像优先于卷内旧程序。部署前备份数据卷，并保持 Master/Server 镜像更新到兼容版本。
+
+Servers 列表显示每台机器上报的版本；管理员可从版本号旁手动更新，或在“更新设置”中开启自动更新并指定 IANA 时区和同一天内的维护窗口（默认 `UTC 03:00–04:00`）。自动更新默认关闭，窗口内每日最多尝试一次，沿用该 Server 当前的 `edge` 或稳定版通道。升级会短暂中断该 Server 的隧道；页面分别显示下载、校验、重启、验证、成功或回退。首次启用前同样要为每台 Server 重新拉取并部署一次新镜像，保留原 `/data` 卷。若 Server 离线、版本无法确认或未找到可靠的新版本，不执行更新。
+
+Clients 仅上报版本。出现新版本时，点击版本号旁的提示，复制对应系统的本地升级命令，在目标 Client 主机执行；网页不会远程升级或重启 Client。macOS 旧版 Agent 的内置自动重启可能失败，因此页面提供分步的升级和原生服务重启命令。执行后确认版本刷新和 Agent 在线。手动 Docker 更新依旧可用，例如在原 Compose 目录执行 `docker compose pull && docker compose up -d`；不要删除卷。
+
+## 7. 网络端口
 
 | 位置 | 端口 | 用途 | 建议 |
 |---|---|---|---|
@@ -172,7 +180,7 @@ Client 上线后无需预先绑定 Server。打开 **Tunnels → 创建 Tunnel**
 | 每台 Server | remote ports | Tunnel 业务入口 | 按业务逐项开放 TCP/UDP |
 | 每台 Server | `8999/tcp` 或 `SERVER_API_PORT` 自定义值 | 本地鉴权 API | 仅回环地址，不开放 |
 
-## 7. 验收与备份
+## 8. 验收与备份
 
 - Master 健康检查地址 `/api/v2/health` 可访问，且公开注册已经关闭。
 - 所有 FRPS 在 Server 列表显示在线；Server 主机只开放计划内的绑定端口和 remote ports。

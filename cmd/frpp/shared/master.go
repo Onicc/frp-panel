@@ -2,9 +2,12 @@ package shared
 
 import (
 	"context"
+	"time"
 
 	"github.com/Onicc/frp-panel/biz/master/auth"
 	"github.com/Onicc/frp-panel/biz/master/proxy"
+	v2 "github.com/Onicc/frp-panel/biz/master/v2"
+	"github.com/Onicc/frp-panel/biz/master/versions"
 	"github.com/Onicc/frp-panel/services/app"
 	"github.com/Onicc/frp-panel/services/cache"
 	"github.com/Onicc/frp-panel/services/master"
@@ -44,12 +47,16 @@ func runMaster(param runMasterParam) {
 	auth.InitAuth(param.AppInstance)
 
 	param.TaskManager.AddCronTask("0 0 3 * * *", proxy.CollectDailyStats, param.AppInstance)
+	param.TaskManager.AddDurationTask(time.Minute, versions.RefreshAll, param.AppInstance)
+	param.TaskManager.AddDurationTask(10*time.Minute, v2.ScheduleServerUpdates, param.AppInstance)
 
 	logger.Logger(param.Ctx).Infof("start to run master")
 	var wg conc.WaitGroup
 
 	param.Lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
+			go versions.RefreshAll(param.AppInstance)       // #nosec G118 -- bounded startup probes
+			go v2.ResumeUpdateOperations(param.AppInstance) // #nosec G118 -- resumes bounded update monitoring
 			wg.Go(func() {
 				if err := param.MasterService.GetServer().Serve(param.WsListener); err != nil {
 					logger.Logger(param.Ctx).Fatalf("gRPC server error: %v", err)

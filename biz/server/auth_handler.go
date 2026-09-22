@@ -13,6 +13,15 @@ import (
 
 func NewRouter(appInstance app.Application) *gin.Engine {
 	router := gin.Default()
+	router.GET("/health", func(ctx *gin.Context) {
+		config := appInstance.GetConfig()
+		controller := appInstance.GetServerController()
+		if controller == nil || controller.Get(config.Client.ID) == nil {
+			ctx.JSON(http.StatusServiceUnavailable, gin.H{"status": "initializing"})
+			return
+		}
+		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 	router.POST("/auth", MakeGinHandlerFunc(appInstance, HandleLogin))
 	return router
 }

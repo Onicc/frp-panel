@@ -27,6 +27,8 @@ COPY --from=web /src/cmd/frpp/out ./cmd/frpp/out
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
     -ldflags="-s -w -X github.com/Onicc/frp-panel/conf.gitVersion=${VERSION} -X github.com/Onicc/frp-panel/conf.gitCommit=${COMMIT} -X github.com/Onicc/frp-panel/conf.buildDate=${BUILD_DATE}" \
     -o /out/frp-panel ./cmd/frpp
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
+    -ldflags="-s -w" -o /out/frp-panel-launcher ./cmd/frp-panel-launcher
 
 FROM go-base AS agent-build
 ARG TARGETOS
@@ -42,11 +44,14 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
 FROM alpine:3.23 AS master
 RUN apk add --no-cache ca-certificates tzdata && addgroup -S -g 10001 frp-panel && adduser -S -D -H -u 10001 -G frp-panel frp-panel && mkdir -p /data && chown frp-panel:frp-panel /data
 COPY --from=master-build /out/frp-panel /usr/local/bin/frp-panel
+COPY --from=master-build /out/frp-panel-launcher /usr/local/bin/frp-panel-launcher
 USER 10001:10001
 VOLUME ["/data"]
 EXPOSE 9000 9001
 ENV DB_TYPE=sqlite3 DB_DSN=/data/frp-panel.db?_pragma=journal_mode(WAL)
-ENTRYPOINT ["/usr/local/bin/frp-panel"]
+ARG COMMIT=unknown
+ENV FRP_PANEL_CONTAINER_UPDATES=1 FRP_PANEL_IMAGE_COMMIT=${COMMIT}
+ENTRYPOINT ["/usr/local/bin/frp-panel-launcher"]
 CMD ["master"]
 
 FROM alpine:3.23 AS agent

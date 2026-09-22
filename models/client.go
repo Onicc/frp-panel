@@ -41,6 +41,8 @@ type ClientEntity struct {
 	ReportedIP         string     `json:"reported_ip"`
 	ReportedAt         *time.Time `json:"reported_at"`
 	LocationIPOverride string     `json:"location_ip_override"`
+	LastVersion        string     `json:"-"`
+	VersionAt          *time.Time `json:"version_at"`
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	DeletedAt          gorm.DeletedAt `gorm:"index"`

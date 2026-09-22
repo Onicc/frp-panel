@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -8,9 +10,49 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/Onicc/frp-panel/biz/common/upgrade"
 	"github.com/Onicc/frp-panel/internal/agent"
 	"github.com/Onicc/frp-panel/internal/agentservice"
 )
+
+func TestAgentUpdateRestartModesWithoutTouchingLocalService(t *testing.T) {
+	for _, tc := range []struct {
+		goos           string
+		restart        bool
+		nativeCalls    int
+		libraryRestart bool
+	}{
+		{"darwin", true, 1, false},
+		{"darwin", false, 0, false},
+		{"linux", true, 0, true},
+	} {
+		calls := 0
+		start := func(_ context.Context, options upgrade.Options) error {
+			if options.Version != "edge" || options.RestartService != tc.libraryRestart || !options.Backup {
+				t.Fatalf("unexpected options: %+v", options)
+			}
+			return nil
+		}
+		control := func(action string) error {
+			if action != "restart" {
+				t.Fatalf("unexpected action: %q", action)
+			}
+			calls++
+			return nil
+		}
+		if err := runAgentUpdate(context.Background(), "edge", tc.restart, tc.goos, start, control); err != nil {
+			t.Fatal(err)
+		}
+		if calls != tc.nativeCalls {
+			t.Fatalf("%s: native calls = %d, want %d", tc.goos, calls, tc.nativeCalls)
+		}
+	}
+	controlCalled := false
+	err := runAgentUpdate(context.Background(), "edge", true, "darwin", func(context.Context, upgrade.Options) error { return errors.New("download failed") }, func(string) error { controlCalled = true; return nil })
+	if err == nil || controlCalled {
+		t.Fatal("failed download must never restart the service")
+	}
+}
 
 func TestClientIDMatchesEnrollment(t *testing.T) {
 	tests := []struct {

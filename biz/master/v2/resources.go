@@ -44,28 +44,37 @@ type pageResult[T any] struct {
 }
 
 type clientResource struct {
-	ID                 string     `json:"id"`
-	Comment            string     `json:"comment"`
-	ConfigurationState string     `json:"configurationState"`
-	Status             string     `json:"status"`
-	Enabled            bool       `json:"enabled"`
-	LastSeenAt         *time.Time `json:"lastSeenAt,omitempty"`
-	EnrolledAt         *time.Time `json:"enrolledAt,omitempty"`
-	TunnelCount        int64      `json:"tunnelCount"`
-	LocationIPOverride string     `json:"locationIpOverride,omitempty"`
+	ID                 string            `json:"id"`
+	Comment            string            `json:"comment"`
+	ConfigurationState string            `json:"configurationState"`
+	Status             string            `json:"status"`
+	Enabled            bool              `json:"enabled"`
+	LastSeenAt         *time.Time        `json:"lastSeenAt,omitempty"`
+	EnrolledAt         *time.Time        `json:"enrolledAt,omitempty"`
+	TunnelCount        int64             `json:"tunnelCount"`
+	LocationIPOverride string            `json:"locationIpOverride,omitempty"`
+	Version            *conf.VersionInfo `json:"version,omitempty"`
+	VersionAt          *time.Time        `json:"versionAt,omitempty"`
 }
 
 type serverResource struct {
-	ID                 string     `json:"id"`
-	Address            string     `json:"address"`
-	BindPort           int        `json:"bindPort"`
-	ServerAPIPort      int        `json:"serverApiPort"`
-	Comment            string     `json:"comment"`
-	ConfigurationState string     `json:"configurationState"`
-	Status             string     `json:"status"`
-	LastSeenAt         *time.Time `json:"lastSeenAt,omitempty"`
-	EnrolledAt         *time.Time `json:"enrolledAt,omitempty"`
-	TunnelCount        int64      `json:"tunnelCount"`
+	ID                 string                  `json:"id"`
+	Address            string                  `json:"address"`
+	BindPort           int                     `json:"bindPort"`
+	ServerAPIPort      int                     `json:"serverApiPort"`
+	Comment            string                  `json:"comment"`
+	ConfigurationState string                  `json:"configurationState"`
+	Status             string                  `json:"status"`
+	LastSeenAt         *time.Time              `json:"lastSeenAt,omitempty"`
+	EnrolledAt         *time.Time              `json:"enrolledAt,omitempty"`
+	TunnelCount        int64                   `json:"tunnelCount"`
+	Version            *conf.VersionInfo       `json:"version,omitempty"`
+	VersionAt          *time.Time              `json:"versionAt,omitempty"`
+	AutoUpdate         bool                    `json:"autoUpdate"`
+	UpdateZone         string                  `json:"updateZone"`
+	UpdateStart        string                  `json:"updateStart"`
+	UpdateEnd          string                  `json:"updateEnd"`
+	UpdateOperation    *models.UpdateOperation `json:"updateOperation,omitempty"`
 }
 
 type topologyNode struct {
@@ -283,7 +292,7 @@ func tunnelStatus(appInstance app.Application, item *models.ProxyConfig) string 
 func clientToResource(appInstance app.Application, db *gorm.DB, item *models.Client) clientResource {
 	var count int64
 	db.Model(&models.ProxyConfig{}).Where("tenant_id = ? AND user_id = ? AND managed_by = ? AND origin_client_id = ?", item.TenantID, item.UserID, "tunnel", item.ClientID).Count(&count)
-	return clientResource{ID: item.ClientID, Comment: item.Comment, ConfigurationState: map[bool]string{true: "configured", false: "unconfigured"}[isConfigured(item.EnrolledAt, item.ConfigContent)], Status: clientStatus(appInstance, item.ClientEntity), Enabled: item.Enabled && !item.Stopped, LastSeenAt: item.LastSeenAt, EnrolledAt: item.EnrolledAt, TunnelCount: count, LocationIPOverride: item.LocationIPOverride}
+	return clientResource{ID: item.ClientID, Comment: item.Comment, ConfigurationState: map[bool]string{true: "configured", false: "unconfigured"}[isConfigured(item.EnrolledAt, item.ConfigContent)], Status: clientStatus(appInstance, item.ClientEntity), Enabled: item.Enabled && !item.Stopped, LastSeenAt: item.LastSeenAt, EnrolledAt: item.EnrolledAt, TunnelCount: count, LocationIPOverride: item.LocationIPOverride, Version: reportedVersion(item.LastVersion), VersionAt: item.VersionAt}
 }
 
 func serverToResource(appInstance app.Application, db *gorm.DB, item *models.Server) serverResource {
@@ -293,7 +302,17 @@ func serverToResource(appInstance app.Application, db *gorm.DB, item *models.Ser
 	if serverAPIPort == 0 {
 		serverAPIPort = defs.DefaultServerAPIPort
 	}
-	return serverResource{ID: item.ServerID, Address: item.ServerIP, BindPort: item.BindPort, ServerAPIPort: serverAPIPort, Comment: item.Comment, ConfigurationState: map[bool]string{true: "configured", false: "unconfigured"}[isConfigured(item.EnrolledAt, item.ConfigContent)], Status: serverStatus(appInstance, item.ServerEntity), LastSeenAt: item.LastSeenAt, EnrolledAt: item.EnrolledAt, TunnelCount: count}
+	zone, start, end := item.UpdateZone, item.UpdateStart, item.UpdateEnd
+	if zone == "" {
+		zone = "UTC"
+	}
+	if start == "" {
+		start = "03:00"
+	}
+	if end == "" {
+		end = "04:00"
+	}
+	return serverResource{ID: item.ServerID, Address: item.ServerIP, BindPort: item.BindPort, ServerAPIPort: serverAPIPort, Comment: item.Comment, ConfigurationState: map[bool]string{true: "configured", false: "unconfigured"}[isConfigured(item.EnrolledAt, item.ConfigContent)], Status: serverStatus(appInstance, item.ServerEntity), LastSeenAt: item.LastSeenAt, EnrolledAt: item.EnrolledAt, TunnelCount: count, Version: reportedVersion(item.LastVersion), VersionAt: item.VersionAt, AutoUpdate: item.AutoUpdate, UpdateZone: zone, UpdateStart: start, UpdateEnd: end, UpdateOperation: latestOperation(db, "server", item.ServerID)}
 }
 
 func normalizeServerPorts(bindPort, serverAPIPort int) (int, int, error) {

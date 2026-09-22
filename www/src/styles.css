@@ -156,11 +156,30 @@ svg.w-8 { width: 2rem; }
 
 .sidebar-header {
   display: flex;
-  height: 72px;
-  align-items: center;
-  padding: 0 24px;
+  min-height: 86px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  padding: 9px 24px;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
+
+.sidebar-version { position: relative; margin-left: 49px; }
+.version-pill { display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 2px 5px; border-radius: 6px; color: var(--text-soft); background: transparent; font: 600 .7rem var(--font-mono); cursor: pointer; }
+.version-pill:hover, .version-pill[aria-expanded="true"] { color: var(--accent); background: var(--accent-lo); }
+.version-pill svg { width: 12px; height: 12px; }
+.version-indicator { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.version-popover { position: absolute; z-index: 60; top: -46px; left: 183px; width: min(300px, calc(100vw - 280px)); padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); box-shadow: var(--shadow-lg); }
+@media (max-width: 620px) { .version-popover { top: calc(100% + 9px); left: -49px; width: min(300px, calc(100vw - 32px)); } }
+.version-popover-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; color: var(--text); font-size: .82rem; }
+.version-line { display: flex; gap: 8px; margin: 6px 0; color: var(--text-muted); font-size: .76rem; }
+.version-line .mono { color: var(--text); overflow-wrap: anywhere; }
+.version-update-button { width: 100%; justify-content: center; margin: 10px 0; }
+.version-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 118px; font-size: .75rem; }
+.version-cell .field-hint { flex-basis: 100%; max-width: 220px; margin: 0; overflow-wrap: anywhere; }
+.version-new { font-size: .72rem; white-space: nowrap; }
+.version-auto-tag { border-radius: 999px; padding: 2px 7px; color: var(--accent); background: var(--accent-lo); font-size: .7rem; font-weight: 650; white-space: nowrap; }
 
 .brand,
 .auth-brand {

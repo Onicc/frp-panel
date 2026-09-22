@@ -39,6 +39,8 @@ func HandleServerMessage(appInstance app.Application, req *pb.ServerMessage) *pb
 			Event: pb.Event_EVENT_PONG,
 			Data:  rawData,
 		}
+	case pb.Event_EVENT_UPGRADE_FRPP:
+		return app.WrapperServerMsg(appInstance, req, HandleUpdateRequest)
 	default:
 	}
 

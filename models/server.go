@@ -28,6 +28,12 @@ type ServerEntity struct {
 	LastSeenIP    string            `json:"last_seen_ip"`
 	BindPort      int               `json:"bind_port"`
 	ServerAPIPort int               `json:"server_api_port" gorm:"not null;default:8999"`
+	LastVersion   string            `json:"-"`
+	VersionAt     *time.Time        `json:"version_at"`
+	AutoUpdate    bool              `json:"auto_update" gorm:"not null;default:false"`
+	UpdateZone    string            `json:"update_zone" gorm:"not null;default:UTC"`
+	UpdateStart   string            `json:"update_start" gorm:"not null;default:03:00"`
+	UpdateEnd     string            `json:"update_end" gorm:"not null;default:04:00"`
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	DeletedAt     gorm.DeletedAt `gorm:"index"`

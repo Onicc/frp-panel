@@ -142,7 +142,15 @@ The public port listens on the selected Server (FRPS) and forwards to the servic
 
 The map uses a manually set public IP in Client editing first, a recent direct Agent public-IP probe second, and the Master-observed connection IP last. The probe bypasses `HTTP_PROXY`/`HTTPS_PROXY`, but a transparent or TUN proxy may still change the result; set the Client's actual public IP manually in that case. The observed fallback is labeled as a possible proxy exit. Upgrade Master, Servers, and Client Agents together to enable the fixes and remove old Agent runtime connections; updating the Web console alone is insufficient.
 
-## 6. Ports and acceptance
+## 6. Version checks and updates
+
+The top-left Master badge shows the installed version and newer GitHub releases in the same channel. **Pull and redeploy an image containing the update launcher once before using Web updates**; setting an environment variable on an old image is insufficient. The Owner may then update Master manually. The official binary is staged on the existing `/data` volume and checked against `checksums.txt`, architecture, and commit before the container launcher restarts it. A failed startup falls back to the image or previous verified binary. Web/API may briefly disconnect. The Web action does not replace the Docker image: after a later image pull/redeploy, the new image takes precedence over the old volume overlay. Back up the volume first and keep Master/Server images compatible.
+
+The Servers list shows each Server's reported version. Administrators may update manually or opt in to automatic updates with an IANA time zone and same-day maintenance window (default `UTC 03:00–04:00`). Automatic updates are off by default, attempt at most once per Server per day in the window, and stay on that Server's `edge` or stable channel. Tunnels may briefly disconnect. The UI distinguishes download, verification, restart, success, and rollback. Each Server also needs one initial image redeploy with its existing `/data` volume. Offline Servers, unknown versions, or unverifiable releases are not updated.
+
+Clients only report their version. When a newer release exists, copy the OS-specific command from the version badge and run it locally on the target host; the console does not remotely update or restart Clients. For old macOS Agents the command separates binary replacement and native LaunchDaemon restart. Verify that the version refreshes and the Agent remains online. Manual Docker updates remain available with `docker compose pull && docker compose up -d` in the original Compose directory; do not remove volumes.
+
+## 7. Ports and acceptance
 
 | Location | Port | Purpose |
 |---|---|---|

@@ -8,6 +8,7 @@
           <small>{{ t('brand.description') }}</small>
         </span>
       </RouterLink>
+      <VersionBadge />
     </div>
 
     <nav class="sidebar-nav">
@@ -43,6 +44,7 @@
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Icon from '../icons/Icon.vue'
+import VersionBadge from './VersionBadge.vue'
 
 defineProps<{ mobileOpen?: boolean }>()
 const emit = defineEmits<{ close: [] }>()

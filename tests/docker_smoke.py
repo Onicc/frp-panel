@@ -2,7 +2,7 @@
 """Isolated Docker smoke test for multi-Client Tunnel identity and cleanup.
 
 From the repository root, build the images with:
-  docker build --target master -t frpp-local-smoke-master:20260922 .
+  docker build --target master --build-arg VERSION=main --build-arg COMMIT=<40-char-commit> -t frpp-local-smoke-master:20260922 .
   docker build --target agent -t frpp-local-smoke-agent:20260922 .
 Then run this script. It removes all containers, anonymous volumes, temporary
 credentials and the test network; remove the two test image tags afterwards.
@@ -70,7 +70,7 @@ def main():
             method=method,
         )
         try:
-            with opener.open(request, timeout=8) as response:
+            with opener.open(request, timeout=25) as response:
                 actual = response.status
                 data = response.read()
         except urllib.error.HTTPError as exc:
@@ -113,6 +113,9 @@ def main():
                 "username": "smoke", "email": "smoke@example.test",
                 "password": "smoke-password-for-local-only",
             }, 201)
+            release = api("GET", "/updates/release")
+            assert release["supported"] is True
+            print("PASS image-owned update launcher is available", flush=True)
 
             def add_server(name, bind_port):
                 created = api("POST", "/servers", {
@@ -130,6 +133,9 @@ def main():
                 return created["server"]["id"]
 
             server_a = add_server("server-a", 7001)
+            eventually("Server health waits for FRPS runtime", lambda: docker(
+                "exec", f"{network}-server-a", "wget", "-qO-", "http://127.0.0.1:8999/health", check=False
+            ).returncode == 0)
             for label in ("a", "b"):
                 content = directory / label
                 content.mkdir()
@@ -161,6 +167,25 @@ def main():
                     f"agent-{label}", AGENT_IMAGE,
                     options=("-v", f"{config}:/etc/frp-panel/agent.yaml:ro"),
                 )
+
+            eventually(
+                "Server and Client report build versions",
+                lambda: all(item.get("version", {}).get("platform") for item in api("GET", "/servers")["items"])
+                and all(item.get("version", {}).get("platform") for item in api("GET", "/clients")["items"]),
+                timeout=95,
+            )
+            api("PATCH", f"/servers/{server_a}/update-policy", {
+                "enabled": True,
+                "timeZone": "Asia/Shanghai",
+                "windowStart": "03:00",
+                "windowEnd": "04:00",
+            })
+            configured = next(item for item in api("GET", "/servers")["items"] if item["id"] == server_a)
+            assert configured["autoUpdate"] and configured["updateZone"] == "Asia/Shanghai"
+            api("PATCH", f"/servers/{server_a}/update-policy", {
+                "enabled": True, "timeZone": "Invalid/Zone", "windowStart": "03:00", "windowEnd": "04:00",
+            }, status=422)
+            print("PASS Server maintenance policy persists", flush=True)
 
             def add_tunnel(label, server_id, name, remote_port):
                 return api("POST", "/tunnels", {

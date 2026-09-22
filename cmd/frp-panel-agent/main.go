@@ -245,16 +245,33 @@ func newUpdateCommand() *cobra.Command {
 		Use:   "update",
 		Short: "Install a verified release with backup and rollback support",
 		RunE: func(command *cobra.Command, _ []string) error {
-			_, err := upgrade.StartWithResult(command.Context(), upgrade.Options{
-				Version: version, Backup: true, RestartService: restart,
-				ServiceName: agentservice.ServiceName,
-			})
-			return err
+			return runAgentUpdate(command.Context(), version, restart, runtime.GOOS,
+				func(ctx context.Context, options upgrade.Options) error {
+					_, err := upgrade.StartWithResult(ctx, options)
+					return err
+				},
+				agentservice.Control)
 		},
 	}
 	cmd.Flags().StringVar(&version, "version", "edge", "release tag or latest stable version")
 	cmd.Flags().BoolVar(&restart, "restart-service", true, "restart service after a successful replacement")
 	return cmd
+}
+
+func runAgentUpdate(ctx context.Context, version string, restart bool, goos string, start func(context.Context, upgrade.Options) error, control func(string) error) error {
+	// The native macOS installation is a system LaunchDaemon with a reverse-DNS
+	// label. kardianos/service constructs another job and fails after replacing
+	// the binary. Restart the native job only after verified staging succeeds.
+	nativeRestart := goos == "darwin" && restart
+	if err := start(ctx, upgrade.Options{Version: version, Backup: true, RestartService: restart && !nativeRestart, ServiceName: agentservice.ServiceName}); err != nil {
+		return err
+	}
+	if nativeRestart {
+		if err := control("restart"); err != nil {
+			return fmt.Errorf("agent binary was updated but LaunchDaemon restart failed: %w", err)
+		}
+	}
+	return nil
 }
 
 func newVersionCommand() *cobra.Command {

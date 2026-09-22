@@ -50,6 +50,7 @@
             <th>{{ t('clients.id') }}</th>
             <th>{{ t('clients.state') }}</th>
             <th>{{ t('clients.status') }}</th>
+            <th>{{ t('updates.version') }}</th>
             <th class="num">{{ t('clients.tunnels') }}</th>
             <th>{{ t('clients.comment') }}</th>
             <th class="actions-col">&nbsp;</th>
@@ -65,6 +66,12 @@
             </td>
             <td><StatusBadge :status="item.configurationState" /></td>
             <td><StatusBadge :status="item.status" /></td>
+            <td>
+              <div class="version-cell">
+                <span class="mono">{{ formatVersion(item.version) }}</span>
+                <button v-if="hasUpdate(item)" class="text-button version-new" type="button" @click="openUpgrade(item)">{{ t('updates.newVersion') }}</button>
+              </div>
+            </td>
             <td class="num">{{ item.tunnelCount }}</td>
             <td class="muted">{{ item.comment || '—' }}</td>
             <td class="row-actions">
@@ -137,6 +144,16 @@
       @cancel="closeDialog"
       @confirm="remove"
     />
+    <BaseDialog :show="dialog === 'upgrade'" :title="t('updates.clientTitle')" @close="closeDialog">
+      <p class="dialog-copy">{{ t('updates.clientLocalOnly') }}</p>
+      <p class="field-hint">{{ t('updates.clientTarget') }}: <span class="mono">{{ selected?.id }}</span> · {{ selected?.version?.platform }}</p>
+      <div class="code-block"><pre><code>{{ upgradeCommand }}</code></pre></div>
+      <p class="field-hint">{{ t('updates.clientVerify') }}</p>
+      <template #footer>
+        <button class="button secondary" type="button" @click="closeDialog">{{ t('common.close') }}</button>
+        <button class="button primary" type="button" :disabled="!upgradeCommand" @click="copy(upgradeCommand)"><Icon name="copy" size="xs" />{{ t('common.copy') }}</button>
+      </template>
+    </BaseDialog>
   </section>
 </template>
 
@@ -151,6 +168,8 @@ import Icon from '../components/icons/Icon.vue'
 import { api, APIError, type Client } from '../api'
 import { useToastStore } from '../stores/toast'
 import { useAutoRefresh } from '../composables/useAutoRefresh'
+import { cachedRelease, clientUpdateCommand, hasNewRelease, loadRelease, versionChannel } from '../composables/useReleaseInfo'
+import type { ReleaseSnapshot, VersionInfo } from '../api'
 
 const { t } = useI18n()
 const toast = useToastStore()
@@ -163,7 +182,8 @@ const total    = ref(0)
 const search       = ref('')
 const stateFilter  = ref('')
 const statusFilter = ref('')
-const dialog   = ref<'create'|'edit'|'rotate'|'delete'|''>('')
+const dialog   = ref<'create'|'edit'|'rotate'|'delete'|'upgrade'|''>('')
+const releases = ref<Partial<Record<'edge'|'stable', ReleaseSnapshot>>>({})
 const selected = ref<Client>()
 const modalError = ref('')
 const copied   = ref(false)
@@ -177,6 +197,18 @@ const platforms = [
 const latestInstall = computed(() =>
   enrollmentCommands.value[platform.value] || enrollmentCommands.value.linux || ''
 )
+const upgradeCommand = computed(() => selected.value?.version ? clientUpdateCommand(selected.value.version, releases.value[versionChannel(selected.value.version) || 'edge']?.latestVersion || '') : '')
+const formatVersion = (version?: VersionInfo) => version ? `${version.gitVersion === 'main' ? 'edge' : version.gitVersion} · ${version.gitCommit.slice(0, 7)}` : '—'
+const hasUpdate = (item: Client) => {
+  const channel = versionChannel(item.version)
+  return channel && hasNewRelease(item.version, releases.value[channel] || cachedRelease(channel)) === true
+}
+const openUpgrade = (item: Client) => { selected.value = item; dialog.value = 'upgrade' }
+const refreshReleases = async (items: Client[]) => {
+  for (const channel of new Set(items.map((item) => versionChannel(item.version)).filter((value): value is 'edge'|'stable' => value !== null))) {
+    try { releases.value[channel] = await loadRelease(channel) } catch { /* status remains unknown */ }
+  }
+}
 const statuses = ['pending', 'online', 'offline', 'error', 'disabled']
 const stateOptions = computed(() => [
   { value: '', label: t('clients.allConfiguration') },
@@ -198,6 +230,7 @@ const loadData = async () => {
     const result = await api.clients({ page: page.value, pageSize, search: search.value, configurationState: stateFilter.value, status: statusFilter.value })
     rows.value  = result.items
     total.value = result.total
+    void refreshReleases(result.items)
   } catch (e) {
     toast.show(e instanceof APIError ? e.message : t('common.error'), 'error')
   }

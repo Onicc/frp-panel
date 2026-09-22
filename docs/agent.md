@@ -26,7 +26,7 @@ sudo /usr/local/libexec/frp-panel/frp-panel-agent service uninstall --purge
 sudo launchctl print system/io.github.onicc.frp-panel.agent
 sudo /usr/local/libexec/frp-panel/frp-panel-agent service restart
 sudo /usr/local/libexec/frp-panel/frp-panel-agent doctor --json
-sudo /usr/local/libexec/frp-panel/frp-panel-agent update --version edge
+sudo /usr/local/libexec/frp-panel/frp-panel-agent update --version edge --restart-service=false && sudo /usr/local/libexec/frp-panel/frp-panel-agent service restart
 sudo /usr/local/libexec/frp-panel/frp-panel-agent service uninstall --purge
 ```
 

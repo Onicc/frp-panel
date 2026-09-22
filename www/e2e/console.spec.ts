@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test'
 
 const user = { username: 'owner', email: 'owner@example.test', role: 'owner' }
-const client = { id: 'owner.c.mac', comment: '', configurationState: 'unconfigured', status: 'pending', enabled: true, tunnelCount: 0 }
-const server = { id: 'owner.s.edge', address: 'edge.example.test', bindPort: 7000, serverApiPort: 8999, comment: '', configurationState: 'unconfigured', status: 'pending', tunnelCount: 0 }
+const oldVersion = { gitVersion: 'v1.0.0', gitCommit: 'a'.repeat(40), buildDate: '2026-01-01T00:00:00Z', platform: 'darwin/arm64' }
+const client = { id: 'owner.c.mac', comment: '', configurationState: 'unconfigured', status: 'pending', enabled: true, tunnelCount: 0, version: oldVersion }
+const server = { id: 'owner.s.edge', address: 'edge.example.test', bindPort: 7000, serverApiPort: 8999, comment: '', configurationState: 'unconfigured', status: 'pending', tunnelCount: 0, version: { ...oldVersion, platform: 'linux/amd64' }, autoUpdate: false, updateZone: 'Asia/Shanghai', updateStart: '03:00', updateEnd: '04:00' }
 const strictCSP = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self' ws: wss: https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://get.geojs.io https://ipwho.is"
 
 async function mockAPI(page: import('@playwright/test').Page) {
@@ -10,6 +11,7 @@ async function mockAPI(page: import('@playwright/test').Page) {
   await page.route('**/api/v2/account', route => route.fulfill({ status: 401, contentType: 'application/problem+json', body: JSON.stringify({ title: 'Unauthorized', detail: 'sign in required' }) }))
   await page.route('**/api/v2/auth/login', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user }) }))
   await page.route('**/api/v2/overview', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ clients: 1, servers: 1, tunnels: 0 }) }))
+  await page.route('**/api/v2/updates/release**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ supported: true, release: { channel: 'stable', currentVersion: 'v1.0.0', currentCommit: 'a'.repeat(40), latestVersion: 'v1.1.0', latestCommit: 'b'.repeat(40), available: true, checkedAt: new Date().toISOString() } }) }))
   await page.route('**/api/v2/topology', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ nodes: [client, server].map((item) => ({ ...item, kind: item.id.includes('.c.') ? 'client' : 'server', label: item.id, enabled: true })), links: [], locatedCount: 0, totalCount: 2, generatedAt: new Date().toISOString() }) }))
   await page.route('**/api/v2/clients**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [client], total: 1, page: 1, pageSize: 25 }) }))
   await page.route('**/api/v2/servers**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [server], total: 1, page: 1, pageSize: 25 }) }))
@@ -18,6 +20,8 @@ async function mockAPI(page: import('@playwright/test').Page) {
 
 test('login renders with the production strict CSP', async ({ page }) => {
   const pageErrors: string[] = []
+  let unauthenticatedReleaseChecks = 0
+  page.on('request', request => { if (request.url().includes('/api/v2/updates/release')) unauthenticatedReleaseChecks += 1 })
   page.on('pageerror', error => pageErrors.push(error.stack || String(error)))
   await page.route('**/*', async route => {
     const response = await route.fetch()
@@ -27,6 +31,7 @@ test('login renders with the production strict CSP', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '登录 Master' })).toBeVisible()
   await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/frppanel-logo.svg')
   expect(pageErrors).toEqual([])
+  expect(unauthenticatedReleaseChecks).toBe(0)
 })
 
 test('invalid sign-in shows a real error and no misleading ok response', async ({ page }) => {
@@ -55,6 +60,55 @@ test('authenticated console exposes resource states and controlled dialogs', asy
   await expect(page.getByRole('dialog')).toBeVisible()
   await page.getByRole('button', { name: '取消' }).click()
   await expect(page.getByRole('dialog')).toBeHidden()
+})
+
+test('version controls show a local Client command and editable Server maintenance window', async ({ page }) => {
+  await mockAPI(page)
+  await page.goto('/login')
+  await page.getByLabel('用户名').fill('owner')
+  await page.getByLabel('密码').fill('correct-password')
+  await page.getByRole('button', { name: '继续' }).click()
+  await page.getByRole('button', { name: 'v1.0.0', exact: false }).first().click()
+  await expect(page.getByText('Master 版本')).toBeVisible()
+  await page.getByRole('complementary', { name: 'Primary navigation' }).getByRole('link', { name: 'Clients', exact: true }).click()
+  await page.getByRole('button', { name: '有新版本' }).click()
+  await expect(page.getByRole('dialog')).toContainText('sudo /usr/local/libexec/frp-panel/frp-panel-agent update --version v1.1.0')
+  await page.getByRole('dialog').getByRole('button', { name: '关闭' }).last().click()
+  await page.getByRole('complementary', { name: 'Primary navigation' }).getByRole('link', { name: 'Servers', exact: true }).click()
+  await page.getByRole('button', { name: '更新设置' }).click()
+  await expect(page.getByRole('dialog').getByLabel('时区（IANA）')).toHaveValue('Asia/Shanghai')
+  await page.getByRole('dialog').getByRole('button', { name: '取消' }).click()
+  await page.getByRole('button', { name: '有新版本' }).click()
+  await expect(page.getByRole('dialog')).toContainText('隧道可能中断')
+})
+
+test('Owner confirms Master update and Server policy saves through scoped API', async ({ page }) => {
+  await mockAPI(page)
+  let masterRequested = false
+  let policyBody: Record<string, unknown> | undefined
+  await page.route('**/api/v2/updates/master', route => {
+    masterRequested = true
+    return route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ operationId: 'test-operation' }) })
+  })
+  await page.route('**/api/v2/servers/*/update-policy', route => {
+    policyBody = route.request().postDataJSON() as Record<string, unknown>
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
+  })
+  await page.route('**/api/v2/updates/operations/test-operation', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ operation: { id: 'test-operation', kind: 'master', targetId: 'master', targetCommit: 'b'.repeat(40), version: 'v1.1.0', state: 'succeeded', startedAt: new Date().toISOString(), updatedAt: new Date().toISOString() } }) }))
+  await page.goto('/login')
+  await page.getByLabel('用户名').fill('owner')
+  await page.getByLabel('密码').fill('correct-password')
+  await page.getByRole('button', { name: '继续' }).click()
+  await page.getByRole('button', { name: 'v1.0.0', exact: false }).first().click()
+  await page.getByRole('button', { name: '立即更新' }).click()
+  expect(masterRequested).toBe(false)
+  await page.getByRole('dialog').getByRole('button', { name: '确认' }).click()
+  await expect.poll(() => masterRequested).toBe(true)
+  await page.getByRole('complementary', { name: 'Primary navigation' }).getByRole('link', { name: 'Servers', exact: true }).click()
+  await page.getByRole('button', { name: '更新设置' }).click()
+  await page.getByRole('dialog').getByLabel('窗口开始').fill('02:00')
+  await page.getByRole('dialog').getByRole('button', { name: '保存' }).click()
+  await expect.poll(() => policyBody).toMatchObject({ enabled: false, timeZone: 'Asia/Shanghai', windowStart: '02:00', windowEnd: '04:00' })
 })
 
 test('Server creation exposes a configurable API port and blocks equal ports', async ({ page }) => {

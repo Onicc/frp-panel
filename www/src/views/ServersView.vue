@@ -44,6 +44,7 @@
             <th class="num">{{ t('servers.serverPort') }}</th>
             <th>{{ t('servers.state') }}</th>
             <th>{{ t('servers.status') }}</th>
+            <th>{{ t('updates.version') }}</th>
             <th class="num">{{ t('servers.tunnels') }}</th>
             <th class="actions-col">&nbsp;</th>
           </tr>
@@ -61,9 +62,19 @@
             <td class="num mono">{{ item.serverApiPort }}</td>
             <td><StatusBadge :status="item.configurationState" /></td>
             <td><StatusBadge :status="item.status" /></td>
+            <td>
+              <div class="version-cell">
+                <span class="mono">{{ formatVersion(item.version) }}</span>
+                <button v-if="hasUpdate(item) && canManageUpdates" class="text-button version-new" type="button" @click="openUpdate(item)">{{ t('updates.newVersion') }}</button>
+                <span v-else-if="hasUpdate(item)" class="version-auto-tag">{{ t('updates.newVersion') }}</span>
+                <span v-if="item.autoUpdate" class="version-auto-tag">{{ t('updates.auto') }}</span>
+                <span v-if="item.updateOperation" class="field-hint" role="status" :title="item.updateOperation.error || undefined">{{ t(`updates.states.${item.updateOperation.state}`) }}{{ item.updateOperation.error ? `: ${item.updateOperation.error}` : '' }}</span>
+              </div>
+            </td>
             <td class="num">{{ item.tunnelCount }}</td>
             <td class="row-actions">
               <button class="icon-button" type="button" :title="t('common.edit')" @click="openEdit(item)"><Icon name="edit" size="sm" /></button>
+              <button v-if="canManageUpdates" class="icon-button" type="button" :title="t('updates.policy')" @click="openPolicy(item)"><Icon name="clock" size="sm" /></button>
               <button class="icon-button" type="button" :title="t('common.rotate')" @click="openRotate(item)"><Icon name="key" size="sm" /></button>
               <button class="icon-button danger-icon" type="button" :title="t('common.delete')" @click="openDelete(item)"><Icon name="trash" size="sm" /></button>
             </td>
@@ -138,6 +149,21 @@
       @cancel="closeDialog"
       @confirm="remove"
     />
+    <BaseDialog :show="dialog === 'policy'" :title="t('updates.policy')" @close="closeDialog">
+      <p class="dialog-copy">{{ t('updates.policyHint') }}</p>
+      <div class="inline-toggle form-toggle"><span class="toggle-copy"><strong>{{ t('updates.auto') }}</strong><small>{{ t('updates.autoHint') }}</small></span><Toggle v-model="policy.enabled" /></div>
+      <Input v-model="policy.timeZone" :label="t('updates.timeZone')" placeholder="Asia/Shanghai" />
+      <div class="form-grid">
+        <Input v-model="policy.windowStart" :label="t('updates.windowStart')" type="time" />
+        <Input v-model="policy.windowEnd" :label="t('updates.windowEnd')" type="time" />
+      </div>
+      <p v-if="modalError" class="error" role="alert">{{ modalError }}</p>
+      <template #footer>
+        <button class="button secondary" type="button" @click="closeDialog">{{ t('common.cancel') }}</button>
+        <button class="button primary" type="button" :disabled="busy" @click="savePolicy">{{ t('common.save') }}</button>
+      </template>
+    </BaseDialog>
+    <ConfirmDialog :show="dialog === 'update'" :title="t('updates.serverTitle')" :message="t('updates.serverDowntime')" :error="modalError" :busy="busy" @cancel="closeDialog" @confirm="startUpdate" />
   </section>
 </template>
 
@@ -146,15 +172,19 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   BaseDialog, ConfirmDialog, DataTable, EmptyState,
-  Input, LoadingSpinner, Pagination, SearchInput, Select, StatusBadge,
+  Input, LoadingSpinner, Pagination, SearchInput, Select, StatusBadge, Toggle,
 } from '../components/common'
 import Icon from '../components/icons/Icon.vue'
-import { api, APIError, type Server } from '../api'
+import { api, APIError, type ReleaseSnapshot, type Server, type VersionInfo } from '../api'
 import { useToastStore } from '../stores/toast'
 import { useAutoRefresh } from '../composables/useAutoRefresh'
+import { cachedRelease, hasNewRelease, loadRelease, versionChannel } from '../composables/useReleaseInfo'
+import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
 const toast = useToastStore()
+const auth = useAuthStore()
+const canManageUpdates = computed(() => auth.user?.role === 'owner' || auth.user?.role === 'admin')
 
 const rows     = ref<Server[]>([])
 const busy     = ref(false)
@@ -164,7 +194,21 @@ const total    = ref(0)
 const search       = ref('')
 const stateFilter  = ref('')
 const statusFilter = ref('')
-const dialog   = ref<'create'|'edit'|'rotate'|'delete'|''>('')
+const dialog   = ref<'create'|'edit'|'rotate'|'delete'|'policy'|'update'|''>('')
+const releases = ref<Partial<Record<'edge'|'stable', ReleaseSnapshot>>>({})
+const policy = reactive({ enabled: false, timeZone: 'UTC', windowStart: '03:00', windowEnd: '04:00' })
+const formatVersion = (version?: VersionInfo) => version ? `${version.gitVersion === 'main' ? 'edge' : version.gitVersion} · ${version.gitCommit.slice(0, 7)}` : '—'
+const hasUpdate = (item: Server) => {
+  const channel = versionChannel(item.version)
+  return channel && hasNewRelease(item.version, releases.value[channel] || cachedRelease(channel)) === true
+}
+const openPolicy = (item: Server) => { selected.value = item; modalError.value = ''; policy.enabled = item.autoUpdate; policy.timeZone = item.updateZone || 'UTC'; policy.windowStart = item.updateStart || '03:00'; policy.windowEnd = item.updateEnd || '04:00'; dialog.value = 'policy' }
+const openUpdate = (item: Server) => { selected.value = item; modalError.value = ''; dialog.value = 'update' }
+const refreshReleases = async (items: Server[]) => {
+  for (const channel of new Set(items.map((item) => versionChannel(item.version)).filter((value): value is 'edge'|'stable' => value !== null))) {
+    try { releases.value[channel] = await loadRelease(channel) } catch { /* status remains unknown */ }
+  }
+}
 const selected = ref<Server>()
 const modalError   = ref('')
 const copied       = ref(false)
@@ -192,6 +236,7 @@ const loadData = async () => {
     const result = await api.servers({ page: page.value, pageSize, search: search.value, configurationState: stateFilter.value, status: statusFilter.value })
     rows.value  = result.items
     total.value = result.total
+    void refreshReleases(result.items)
   } catch (e) {
     toast.show(e instanceof APIError ? e.message : t('common.error'), 'error')
   }
@@ -205,6 +250,25 @@ const openCreate  = () => { reset(); dialog.value = 'create' }
 const openEdit    = (item: Server) => { reset(); selected.value = item; form.serverId = item.id; form.address = item.address; form.bindPort = item.bindPort; form.serverApiPort = item.serverApiPort || 8999; form.comment = item.comment; dialog.value = 'edit' }
 const openRotate  = (item: Server) => { reset(); selected.value = item; dialog.value = 'rotate' }
 const openDelete  = (item: Server) => { selected.value = item; dialog.value = 'delete' }
+
+const savePolicy = async () => {
+  if (!selected.value) return
+  busy.value = true; modalError.value = ''
+  try {
+    await api.setServerUpdatePolicy(selected.value.id, policy)
+    toast.show(t('common.success')); closeDialog(); await load()
+  } catch (e) { modalError.value = e instanceof APIError ? e.message : t('common.error') }
+  finally { busy.value = false }
+}
+const startUpdate = async () => {
+  if (!selected.value) return
+  busy.value = true; modalError.value = ''
+  try {
+    await api.updateServerBinary(selected.value.id)
+    toast.show(t('updates.started')); closeDialog(); await load()
+  } catch (e) { modalError.value = e instanceof APIError ? e.message : t('common.error') }
+  finally { busy.value = false }
+}
 
 const saveServer = async () => {
   modalError.value = ''

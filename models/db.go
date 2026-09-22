@@ -212,6 +212,42 @@ var migrations = []migration{
 			return tx.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_tunnel_client_name ON proxy_config (tenant_id, user_id, origin_client_id, name) WHERE managed_by = 'tunnel' AND deleted_at IS NULL").Error
 		},
 	},
+	{
+		version: 8,
+		name:    "resource_update_state",
+		up: func(tx *gorm.DB) error {
+			for _, field := range []struct {
+				model any
+				name  string
+			}{
+				{&Client{}, "LastVersion"}, {&Client{}, "VersionAt"},
+				{&Server{}, "LastVersion"}, {&Server{}, "VersionAt"},
+				{&Server{}, "AutoUpdate"}, {&Server{}, "UpdateZone"},
+				{&Server{}, "UpdateStart"}, {&Server{}, "UpdateEnd"},
+			} {
+				if !tx.Migrator().HasColumn(field.model, field.name) {
+					if err := tx.Migrator().AddColumn(field.model, field.name); err != nil {
+						return err
+					}
+				}
+			}
+			if !tx.Migrator().HasTable(&UpdateOperation{}) {
+				if err := tx.Migrator().CreateTable(&UpdateOperation{}); err != nil {
+					return err
+				}
+			}
+			if err := tx.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_active_update_target ON update_operations (kind, target_id) WHERE state IN ('queued','downloading','staged','restarting','verifying')").Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&Server{}).Where("update_zone = '' OR update_zone IS NULL").Update("update_zone", "UTC").Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&Server{}).Where("update_start = '' OR update_start IS NULL").Update("update_start", "03:00").Error; err != nil {
+				return err
+			}
+			return tx.Model(&Server{}).Where("update_end = '' OR update_end IS NULL").Update("update_end", "04:00").Error
+		},
+	},
 }
 
 func runMigrations(db *gorm.DB) error {
