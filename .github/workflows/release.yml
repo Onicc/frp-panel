@@ -164,7 +164,7 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          gh api "repos/Onicc/frp-panel/releases/tags/$RELEASE_TAG" --jq '.draft and (.assets | length >= 17)' | grep -Fxq true
+          gh release view "$RELEASE_TAG" --repo Onicc/frp-panel --json isDraft,assets --jq '.isDraft and (.assets | length >= 17)' | grep -Fxq true
           mkdir -p release-assets
           gh release download "$RELEASE_TAG" --repo Onicc/frp-panel --dir release-assets
           (cd release-assets && sha256sum -c checksums.txt)
