@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/Onicc/frp-panel/internal/release"
@@ -276,11 +275,4 @@ func stage(ctx context.Context, rel release.Release, operationID string, downloa
 		return err
 	}
 	return nil
-}
-
-func RestartAfterResponse() {
-	go func() {
-		time.Sleep(750 * time.Millisecond)
-		_ = syscall.Kill(os.Getpid(), syscall.SIGTERM)
-	}()
 }
