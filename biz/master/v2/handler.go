@@ -25,6 +25,7 @@ func Configure(router *gin.RouterGroup, appInstance app.Application) {
 	})
 	router.GET("/bootstrap-status", bootstrapStatus(appInstance))
 	router.POST("/agent/enroll", middleware.LoginRateLimit(), redeemEnrollment(appInstance))
+	router.POST("/agent/location", reportClientLocation(appInstance))
 	router.POST("/server/enroll", middleware.LoginRateLimit(), redeemServerEnrollment(appInstance))
 	router.POST("/auth/login", middleware.LoginRateLimit(), login(appInstance))
 	router.POST("/auth/register", middleware.LoginRateLimit(), register(appInstance))

@@ -58,6 +58,7 @@ func (c *clientController) Delete(clientID string, serverID string) {
 }
 
 func (c *clientController) DeleteByClient(clientID string) {
+	c.StopByClient(clientID)
 	c.clients.Delete(clientID)
 }
 

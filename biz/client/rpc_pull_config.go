@@ -40,7 +40,6 @@ func PullConfig(appInstance app.Application, clientID, clientSecret string) erro
 		if len(idsToRemove) > 0 {
 			logger.Logger(ctx).Infof("client [%s] has %d expired child clients, remove clientIDs: [%+v]", clientID, len(idsToRemove), idsToRemove)
 			for _, id := range idsToRemove {
-				ctrl.StopByClient(id)
 				ctrl.DeleteByClient(id)
 			}
 		}
@@ -83,7 +82,6 @@ func PullConfig(appInstance app.Application, clientID, clientSecret string) erro
 			logger.Logger(ctx).Infof("client [%s] for server [%s] config changed, will recreate it", clientID, serverID)
 			tcli := ctrl.Get(clientID, serverID)
 			if tcli != nil {
-				tcli.Stop()
 				ctrl.Delete(clientID, serverID)
 			}
 			ctrl.Add(clientID, serverID, client.NewClientHandler(c, p, v))
@@ -93,7 +91,6 @@ func PullConfig(appInstance app.Application, clientID, clientSecret string) erro
 			tcli := ctrl.Get(clientID, serverID)
 			if tcli == nil || !tcli.Running() {
 				if tcli != nil {
-					tcli.Stop()
 					ctrl.Delete(clientID, serverID)
 				}
 				ctrl.Add(clientID, serverID, client.NewClientHandler(c, p, v))

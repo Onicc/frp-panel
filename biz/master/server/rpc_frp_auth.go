@@ -8,6 +8,7 @@ import (
 	"github.com/Onicc/frp-panel/services/app"
 	"github.com/Onicc/frp-panel/services/cache"
 	"github.com/Onicc/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/utils"
 	"github.com/Onicc/frp-panel/utils/logger"
 )
 
@@ -17,13 +18,14 @@ func FRPAuth(ctx *app.Context, req *pb.FRPAuthRequest) (*pb.FRPAuthResponse, err
 		err error
 	)
 
-	userToken, err := cache.Get().Get([]byte(req.User))
+	accountName := utils.FRPAccountName(req.GetUser())
+	userToken, err := cache.Get().Get([]byte(accountName))
 	if err != nil {
-		u, err := dao.NewQuery(ctx).GetUserByUserName(req.User)
+		u, err := dao.NewQuery(ctx).GetUserByUserName(accountName)
 		if err != nil || u == nil {
 			logger.Logger(context.Background()).WithError(err).Errorf("invalid user: %s", req.User)
 			return &pb.FRPAuthResponse{
-				Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: err.Error()},
+				Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: "invalid user"},
 				Ok:     false,
 			}, fmt.Errorf("invalid user: %s", req.User)
 		}

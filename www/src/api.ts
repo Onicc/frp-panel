@@ -1,8 +1,8 @@
 export type Account = { username:string; email:string; role:string }
-export type Client = { id:string; comment:string; configurationState:'configured'|'unconfigured'; status:'pending'|'online'|'offline'|'error'|'disabled'; enabled:boolean; lastSeenAt?:string; enrolledAt?:string; tunnelCount:number }
+export type Client = { id:string; comment:string; configurationState:'configured'|'unconfigured'; status:'pending'|'online'|'offline'|'error'|'disabled'; enabled:boolean; lastSeenAt?:string; enrolledAt?:string; tunnelCount:number; locationIpOverride?:string }
 export type Server = { id:string; address:string; bindPort:number; serverApiPort:number; comment:string; configurationState:'configured'|'unconfigured'; status:'pending'|'online'|'offline'|'error'|'disabled'; lastSeenAt?:string; enrolledAt?:string; tunnelCount:number }
 export type Tunnel = { id:string; name:string; clientId:string; serverId:string; serverAddress?:string; type:'tcp'|'udp'; localHost:string; localPort:number; remotePort:number; enabled:boolean; status:string; lastError?:string; updatedAt:string }
-export type TopologyNode = { id:string; kind:'client'|'server'; label:string; comment?:string; address?:string; status:string; configurationState:string; enabled:boolean; locationIp?:string; lastSeenAt?:string; tunnelCount:number }
+export type TopologyNode = { id:string; kind:'client'|'server'; label:string; comment?:string; address?:string; status:string; configurationState:string; enabled:boolean; locationIp?:string; locationSource?:'manual'|'agent_probe'|'observed'|'configured'; observedIp?:string; reportedIp?:string; reportedAt?:string; lastSeenAt?:string; tunnelCount:number }
 export type TopologyLink = { id:string; name:string; sourceClientId:string; targetServerId:string; type:'tcp'|'udp'; remotePort:number; enabled:boolean; status:string; lastError?:string }
 export type TopologyResponse = { nodes:TopologyNode[]; links:TopologyLink[]; locatedCount:number; totalCount:number; generatedAt:string }
 export type Page<T> = { items:T[]; total:number; page:number; pageSize:number }

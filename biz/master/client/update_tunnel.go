@@ -140,7 +140,7 @@ func UpdateFrpcHander(c *app.Context, req *pb.UpdateFRPCRequest) (*pb.UpdateFRPC
 		cli.FrpsUrl = urlToParse
 	}
 
-	cliCfg.User = userInfo.GetUserName()
+	cliCfg.User = utils.FRPClientUser(userInfo.GetUserName(), reqClientID)
 
 	if cliCfg.Metadatas == nil {
 		cliCfg.Metadatas = make(map[string]string)

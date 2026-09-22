@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Onicc/frp-panel/common"
@@ -32,6 +33,9 @@ import (
 
 const defaultPageSize = 25
 
+var tunnelPairLocks sync.Map
+var tunnelServerLocks sync.Map
+
 type pageResult[T any] struct {
 	Items    []T   `json:"items"`
 	Total    int64 `json:"total"`
@@ -48,6 +52,7 @@ type clientResource struct {
 	LastSeenAt         *time.Time `json:"lastSeenAt,omitempty"`
 	EnrolledAt         *time.Time `json:"enrolledAt,omitempty"`
 	TunnelCount        int64      `json:"tunnelCount"`
+	LocationIPOverride string     `json:"locationIpOverride,omitempty"`
 }
 
 type serverResource struct {
@@ -73,6 +78,10 @@ type topologyNode struct {
 	ConfigurationState string     `json:"configurationState"`
 	Enabled            bool       `json:"enabled"`
 	LocationIP         string     `json:"locationIp,omitempty"`
+	LocationSource     string     `json:"locationSource,omitempty"`
+	ObservedIP         string     `json:"observedIp,omitempty"`
+	ReportedIP         string     `json:"reportedIp,omitempty"`
+	ReportedAt         *time.Time `json:"reportedAt,omitempty"`
 	LastSeenAt         *time.Time `json:"lastSeenAt,omitempty"`
 	TunnelCount        int64      `json:"tunnelCount"`
 }
@@ -122,10 +131,11 @@ type clientCreateRequest struct {
 	Comment  string `json:"comment"`
 }
 type clientPatchRequest struct {
-	ClientID *string `json:"clientId"`
-	ID       *string `json:"id"`
-	Comment  *string `json:"comment"`
-	Enabled  *bool   `json:"enabled"`
+	ClientID           *string `json:"clientId"`
+	ID                 *string `json:"id"`
+	Comment            *string `json:"comment"`
+	Enabled            *bool   `json:"enabled"`
+	LocationIPOverride *string `json:"locationIpOverride"`
 }
 type serverCreateRequest struct {
 	ServerID      string `json:"serverId"`
@@ -273,7 +283,7 @@ func tunnelStatus(appInstance app.Application, item *models.ProxyConfig) string 
 func clientToResource(appInstance app.Application, db *gorm.DB, item *models.Client) clientResource {
 	var count int64
 	db.Model(&models.ProxyConfig{}).Where("tenant_id = ? AND user_id = ? AND managed_by = ? AND origin_client_id = ?", item.TenantID, item.UserID, "tunnel", item.ClientID).Count(&count)
-	return clientResource{ID: item.ClientID, Comment: item.Comment, ConfigurationState: map[bool]string{true: "configured", false: "unconfigured"}[isConfigured(item.EnrolledAt, item.ConfigContent)], Status: clientStatus(appInstance, item.ClientEntity), Enabled: item.Enabled && !item.Stopped, LastSeenAt: item.LastSeenAt, EnrolledAt: item.EnrolledAt, TunnelCount: count}
+	return clientResource{ID: item.ClientID, Comment: item.Comment, ConfigurationState: map[bool]string{true: "configured", false: "unconfigured"}[isConfigured(item.EnrolledAt, item.ConfigContent)], Status: clientStatus(appInstance, item.ClientEntity), Enabled: item.Enabled && !item.Stopped, LastSeenAt: item.LastSeenAt, EnrolledAt: item.EnrolledAt, TunnelCount: count, LocationIPOverride: item.LocationIPOverride}
 }
 
 func serverToResource(appInstance app.Application, db *gorm.DB, item *models.Server) serverResource {
@@ -463,8 +473,16 @@ func patchClient(appInstance app.Application) gin.HandlerFunc {
 			updates["enabled"] = *req.Enabled
 			updates["stopped"] = !*req.Enabled
 		}
+		if req.LocationIPOverride != nil {
+			value := strings.TrimSpace(*req.LocationIPOverride)
+			if value != "" && publicLocationIP(value) == "" {
+				AbortProblem(c, 400, "Invalid location IP", "enter a public IPv4 or IPv6 address, or leave blank for automatic location")
+				return
+			}
+			updates["location_ip_override"] = value
+		}
 		if len(updates) == 0 {
-			AbortProblem(c, 400, "No changes", "provide comment or enabled")
+			AbortProblem(c, 400, "No changes", "provide comment, enabled, or locationIpOverride")
 			return
 		}
 		if err := db.Model(&models.Client{}).Where("client_id = ? AND user_id = ? AND tenant_id = ?", id, user.GetUserID(), user.GetTenantID()).Updates(updates).Error; err != nil {
@@ -472,6 +490,9 @@ func patchClient(appInstance app.Application) gin.HandlerFunc {
 			return
 		}
 		db.Where("client_id = ?", id).First(&item)
+		if req.Enabled != nil {
+			go ReconcileClientTunnels(appInstance, id)
+		}
 		c.JSON(200, gin.H{"client": clientToResource(appInstance, db, &item)})
 	}
 }
@@ -802,21 +823,10 @@ func patchServer(appInstance app.Application) gin.HandlerFunc {
 		}
 		db.Where("server_id = ?", id).First(&item)
 		if addressChanged {
-			// Apply the new FRPS settings and endpoint to connected peers without
-			// making the HTTP request wait for a remote host. Offline peers will
-			// receive the durable configuration on their next pull/reconcile.
-			go pushServerConfiguration(appInstance, id)
-			var tunnelRows []models.ProxyConfig
-			if db.Where("user_id = ? AND tenant_id = ? AND managed_by = ? AND server_id = ?", user.GetUserID(), user.GetTenantID(), "tunnel", id).Find(&tunnelRows).Error == nil {
-				seenClients := make(map[string]struct{}, len(tunnelRows))
-				for _, tunnel := range tunnelRows {
-					if _, seen := seenClients[tunnel.OriginClientID]; seen {
-						continue
-					}
-					seenClients[tunnel.OriginClientID] = struct{}{}
-					go applyTunnelPair(appInstance, tunnel.OriginClientID, id)
-				}
-			}
+			go func() {
+				pushServerConfiguration(appInstance, id)
+				ReconcileServerTunnels(appInstance, id)
+			}()
 		}
 		c.JSON(200, gin.H{"server": serverToResource(appInstance, db, &item)})
 	}
@@ -1009,6 +1019,10 @@ func createTunnelResource(appInstance app.Application) gin.HandlerFunc {
 			AbortProblem(c, 404, "Server not found", "select an existing Server")
 			return
 		}
+		lock, _ := tunnelServerLocks.LoadOrStore(req.ServerID, &sync.Mutex{})
+		mu := lock.(*sync.Mutex)
+		mu.Lock()
+		defer mu.Unlock()
 		var count int64
 		db.Model(&models.ProxyConfig{}).Where("user_id = ? AND tenant_id = ? AND managed_by = ? AND origin_client_id = ? AND name = ?", user.GetUserID(), user.GetTenantID(), "tunnel", req.ClientID, req.Name).Count(&count)
 		if count > 0 {
@@ -1159,6 +1173,10 @@ func patchTunnel(appInstance app.Application) gin.HandlerFunc {
 			AbortProblem(c, 400, "Invalid Tunnel update", err.Error())
 			return
 		}
+		lock, _ := tunnelServerLocks.LoadOrStore(old.ServerID, &sync.Mutex{})
+		mu := lock.(*sync.Mutex)
+		mu.Lock()
+		defer mu.Unlock()
 		if old.ClientID != item.OriginClientID || old.Name != item.Name {
 			var count int64
 			db.Model(&models.ProxyConfig{}).Where("user_id = ? AND tenant_id = ? AND managed_by = ? AND origin_client_id = ? AND name = ? AND public_id <> ?", user.GetUserID(), user.GetTenantID(), "tunnel", old.ClientID, old.Name, item.PublicID).Count(&count)
@@ -1183,7 +1201,11 @@ func patchTunnel(appInstance app.Application) gin.HandlerFunc {
 		nextRevision := item.DesiredRevision + 1
 		updates := map[string]any{"name": old.Name, "type": old.Type, "server_id": old.ServerID, "client_id": old.ClientID, "origin_client_id": old.ClientID, "content": content, "stopped": !*old.Enabled, "desired_revision": nextRevision, "last_error": ""}
 		if err := db.Model(&models.ProxyConfig{}).Where("public_id = ?", item.PublicID).Updates(updates).Error; err != nil {
-			AbortProblem(c, 500, "Tunnel update failed", "could not save the Tunnel")
+			if strings.Contains(strings.ToLower(err.Error()), "unique") {
+				AbortProblem(c, 409, "Tunnel already exists", "choose a unique Tunnel name for this Client")
+			} else {
+				AbortProblem(c, 500, "Tunnel update failed", "could not save the Tunnel")
+			}
 			return
 		}
 		db.Where("public_id = ?", item.PublicID).First(&item)
@@ -1242,6 +1264,19 @@ func publicLocationIP(value string) string {
 	return ip.String()
 }
 
+func clientLocation(item *models.ClientEntity) (string, string) {
+	if ip := publicLocationIP(item.LocationIPOverride); ip != "" {
+		return ip, "manual"
+	}
+	if ip := publicLocationIP(item.ReportedIP); ip != "" && item.ReportedAt != nil && time.Since(*item.ReportedAt) < 24*time.Hour {
+		return ip, "agent_probe"
+	}
+	if ip := publicLocationIP(item.LastSeenIP); ip != "" {
+		return ip, "observed"
+	}
+	return "", ""
+}
+
 func topology(appInstance app.Application) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, ok := currentUser(c)
@@ -1273,10 +1308,12 @@ func topology(appInstance app.Application) gin.HandlerFunc {
 			item := &clients[i]
 			resource := clientToResource(appInstance, db, item)
 			clientIDs[item.ClientID] = struct{}{}
+			locationIP, source := clientLocation(item.ClientEntity)
 			nodes = append(nodes, topologyNode{
 				ID: item.ClientID, Kind: "client", Label: item.ClientID, Comment: item.Comment,
 				Status: resource.Status, ConfigurationState: resource.ConfigurationState,
-				Enabled: resource.Enabled, LocationIP: publicLocationIP(item.LastSeenIP),
+				Enabled: resource.Enabled, LocationIP: locationIP, LocationSource: source,
+				ObservedIP: publicLocationIP(item.LastSeenIP), ReportedIP: publicLocationIP(item.ReportedIP), ReportedAt: item.ReportedAt,
 				LastSeenAt: item.LastSeenAt, TunnelCount: resource.TunnelCount,
 			})
 		}
@@ -1284,14 +1321,16 @@ func topology(appInstance app.Application) gin.HandlerFunc {
 			item := &servers[i]
 			resource := serverToResource(appInstance, db, item)
 			serverIDs[item.ServerID] = struct{}{}
-			locationIP := publicLocationIP(item.LastSeenIP)
+			locationIP := publicLocationIP(item.ServerIP)
+			locationSource := "configured"
 			if locationIP == "" {
-				locationIP = publicLocationIP(item.ServerIP)
+				locationIP = publicLocationIP(item.LastSeenIP)
+				locationSource = "observed"
 			}
 			nodes = append(nodes, topologyNode{
 				ID: item.ServerID, Kind: "server", Label: item.ServerID, Comment: item.Comment,
 				Address: item.ServerIP, Status: resource.Status, ConfigurationState: resource.ConfigurationState,
-				Enabled: true, LocationIP: locationIP, LastSeenAt: item.LastSeenAt, TunnelCount: resource.TunnelCount,
+				Enabled: true, LocationIP: locationIP, LocationSource: locationSource, ObservedIP: publicLocationIP(item.LastSeenIP), LastSeenAt: item.LastSeenAt, TunnelCount: resource.TunnelCount,
 			})
 		}
 
@@ -1435,6 +1474,54 @@ func reconcileTunnel(appInstance app.Application, rowID uint) {
 	applyTunnelPair(appInstance, item.OriginClientID, item.ServerID)
 }
 
+// ReconcileClientTunnels re-applies durable Tunnel state after an Agent
+// reconnects or its desired lifecycle state changes.
+func ReconcileClientTunnels(appInstance app.Application, clientID string) {
+	var rows []models.ProxyConfig
+	db := appInstance.GetDBManager().GetDefaultDB()
+	if db.Where("managed_by = ? AND origin_client_id = ?", "tunnel", clientID).Find(&rows).Error != nil {
+		return
+	}
+	seen := map[string]bool{}
+	for _, row := range rows {
+		if !seen[row.ServerID] {
+			seen[row.ServerID] = true
+			applyTunnelPair(appInstance, clientID, row.ServerID)
+		}
+	}
+}
+
+// ResetAndReconcileClient removes runtime connections that may no longer have
+// database rows, then rebuilds every currently desired pair on reconnect.
+func ResetAndReconcileClient(appInstance app.Application, clientID string) {
+	if !connectorOnline(appInstance, clientID) {
+		return
+	}
+	ctx := app.NewContext(context.Background(), appInstance)
+	if _, err := rpc.CallClient(ctx, clientID, pb.Event_EVENT_REMOVE_FRPC, &pb.RemoveFRPCRequest{ClientId: &clientID}); err != nil {
+		appInstance.Logger(ctx).WithError(err).Warnf("could not reset Client runtime: %s", clientID)
+		return
+	}
+	ReconcileClientTunnels(appInstance, clientID)
+}
+
+// ReconcileServerTunnels reapplies all Client connections for a Server after
+// FRPS registration or a bind/address change.
+func ReconcileServerTunnels(appInstance app.Application, serverID string) {
+	var rows []models.ProxyConfig
+	db := appInstance.GetDBManager().GetDefaultDB()
+	if db.Where("managed_by = ? AND server_id = ?", "tunnel", serverID).Find(&rows).Error != nil {
+		return
+	}
+	seen := map[string]bool{}
+	for _, row := range rows {
+		if !seen[row.OriginClientID] {
+			seen[row.OriginClientID] = true
+			applyTunnelPair(appInstance, row.OriginClientID, serverID)
+		}
+	}
+}
+
 func pushServerConfiguration(appInstance app.Application, serverID string) {
 	if !connectorOnline(appInstance, serverID) {
 		return
@@ -1457,6 +1544,11 @@ func pushServerConfiguration(appInstance app.Application, serverID string) {
 }
 
 func applyTunnelPair(appInstance app.Application, clientID, serverID string) {
+	lock, _ := tunnelPairLocks.LoadOrStore(clientID+"\x00"+serverID, &sync.Mutex{})
+	mu := lock.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
+
 	db := appInstance.GetDBManager().GetDefaultDB()
 	var client models.Client
 	var server models.Server
@@ -1467,22 +1559,15 @@ func applyTunnelPair(appInstance app.Application, clientID, serverID string) {
 	if err := db.Where("managed_by = ? AND origin_client_id = ? AND server_id = ? AND stopped = ?", "tunnel", clientID, serverID, false).Order("id ASC").Find(&rows).Error; err != nil {
 		return
 	}
-	if len(rows) == 0 {
-		// The wire protocol's legacy REMOVE_FRPC message addresses a physical
-		// Client, so only use it when no active Tunnel remains anywhere on that
-		// Client. This avoids disrupting another Client→Server pair while still
-		// removing the final stale FRPC connection after the last Tunnel is gone.
-		var remaining int64
-		if db.Model(&models.ProxyConfig{}).Where("managed_by = ? AND origin_client_id = ? AND stopped = ?", "tunnel", clientID, false).Count(&remaining).Error != nil || remaining > 0 || !connectorOnline(appInstance, clientID) {
-			return
-		}
-		ctx := app.NewContext(context.Background(), appInstance)
-		if _, err := rpc.CallClient(ctx, clientID, pb.Event_EVENT_REMOVE_FRPC, &pb.RemoveFRPCRequest{ClientId: &clientID}); err != nil {
-			return
-		}
+	if !connectorOnline(appInstance, clientID) {
 		return
 	}
-	if !client.Enabled || client.Stopped || !isConfigured(client.EnrolledAt, client.ConfigContent) || !isConfigured(server.EnrolledAt, server.ConfigContent) || !connectorOnline(appInstance, clientID) {
+	if len(rows) == 0 || !client.Enabled || client.Stopped || !isConfigured(client.EnrolledAt, client.ConfigContent) || !isConfigured(server.EnrolledAt, server.ConfigContent) {
+		// An empty configuration addresses exactly one Client→Server connection.
+		// REMOVE_FRPC addresses the whole physical Client and must not be used here.
+		raw := []byte(`{"proxies":[]}`)
+		ctx := app.NewContext(context.Background(), appInstance)
+		_, _ = rpc.CallClient(ctx, clientID, pb.Event_EVENT_UPDATE_FRPC, &pb.UpdateFRPCRequest{ClientId: &clientID, ServerId: &serverID, Config: raw})
 		return
 	}
 	var err error
@@ -1505,7 +1590,7 @@ func applyTunnelPair(appInstance app.Application, clientID, serverID string) {
 	if bindPort == 0 {
 		bindPort = serverConfig.BindPort
 	}
-	clientConfig.ClientCommonConfig = *utils.NewBaseFRPClientUserAuthConfig(server.ServerIP, bindPort, user.UserName, user.Token)
+	clientConfig.ClientCommonConfig = *utils.NewBaseFRPClientUserAuthConfig(server.ServerIP, bindPort, utils.FRPClientUser(user.UserName, clientID), user.Token)
 	clientConfig.Proxies = nil
 	for _, row := range rows {
 		var typed v1.TypedProxyConfig

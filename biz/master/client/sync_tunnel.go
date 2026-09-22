@@ -7,6 +7,7 @@ import (
 	"github.com/Onicc/frp-panel/models"
 	"github.com/Onicc/frp-panel/services/app"
 	"github.com/Onicc/frp-panel/services/dao"
+	"github.com/Onicc/frp-panel/utils"
 	"github.com/Onicc/frp-panel/utils/logger"
 	"github.com/samber/lo"
 )
@@ -23,7 +24,11 @@ func SyncTunnel(ctx *app.Context, userInfo models.UserInfo) error {
 			return
 		}
 
-		cfg.User = userInfo.GetUserName()
+		originID := cli.OriginClientID
+		if originID == "" {
+			originID = cli.ClientID
+		}
+		cfg.User = utils.FRPClientUser(userInfo.GetUserName(), originID)
 		cfg.Metadatas = map[string]string{
 			defs.FRPAuthTokenKey: userInfo.GetToken(),
 		}

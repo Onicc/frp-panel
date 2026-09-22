@@ -2,10 +2,12 @@ package shared
 
 import (
 	"context"
+	"time"
 
 	bizclient "github.com/Onicc/frp-panel/biz/client"
 	"github.com/Onicc/frp-panel/conf"
 	"github.com/Onicc/frp-panel/defs"
+	"github.com/Onicc/frp-panel/internal/agent"
 	"github.com/Onicc/frp-panel/pb"
 	"github.com/Onicc/frp-panel/services/app"
 	"github.com/Onicc/frp-panel/services/clientrpc"
@@ -51,6 +53,7 @@ func runClient(param runClientParam) {
 		bizclient.PullConfig, appInstance, clientID, clientSecret)
 	param.TaskManager.AddDurationTask(defs.PullClientWorkersDuration,
 		bizclient.PullWorkers, appInstance, clientID, clientSecret)
+	param.TaskManager.AddDurationTask(5*time.Minute, reportClientLocation, context.Background(), appInstance, clientID, clientSecret)
 	if appInstance.GetConfig().Client.Features.EnableWireGuard {
 		param.TaskManager.AddDurationTask(defs.PullClientWireGuardsDuration,
 			bizclient.PullWireGuards, appInstance, clientID, clientSecret)
@@ -77,6 +80,7 @@ func runClient(param runClientParam) {
 
 			// --- init once start ---
 			initClientOnce(appInstance, clientID, clientSecret)
+			go reportClientLocation(context.WithoutCancel(ctx), appInstance, clientID, clientSecret)
 			initClientWorkerOnce(appInstance, clientID, clientSecret)
 			if appInstance.GetConfig().Client.Features.EnableWireGuard {
 				initClientWireGuardOnce(appInstance, clientID, clientSecret)
@@ -95,6 +99,20 @@ func runClient(param runClientParam) {
 			return nil
 		},
 	})
+}
+
+func reportClientLocation(parent context.Context, appInstance app.Application, clientID, clientSecret string) {
+	ctx, cancel := context.WithTimeout(parent, 20*time.Second)
+	defer cancel()
+	ip, err := agent.ProbePublicIP(ctx)
+	if err != nil {
+		logger.Logger(ctx).WithError(err).Warn("could not probe direct public IP")
+		return
+	}
+	cfg := appInstance.GetConfig()
+	if err := agent.ReportPublicIP(ctx, cfg.Client.APIUrl, clientID, clientSecret, ip, cfg.Client.TLSInsecureSkipVerify); err != nil {
+		logger.Logger(ctx).WithError(err).Warn("could not report Client location")
+	}
 }
 
 func initClientOnce(appInstance app.Application, clientID, clientSecret string) {

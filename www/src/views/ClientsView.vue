@@ -92,6 +92,10 @@
       <form @submit.prevent="saveClient">
         <Input v-model="form.clientId" :label="t('clients.id')" :disabled="dialog === 'edit'" required />
         <Input v-model="form.comment" :label="t('clients.comment')" />
+        <template v-if="dialog === 'edit'">
+          <Input v-model="form.locationIpOverride" :label="t('clients.locationIp')" :placeholder="t('clients.locationIpPlaceholder')" />
+          <p class="field-hint">{{ t('clients.locationIpHint') }}</p>
+        </template>
         <div v-if="dialog === 'edit'" class="inline-toggle form-toggle">
           <span class="toggle-copy"><strong>{{ t('common.enabled') }}</strong><small>{{ t('clients.enabledHint') }}</small></span>
           <Toggle v-model="form.enabled" />
@@ -183,7 +187,7 @@ const statusOptions = computed(() => [
   { value: '', label: t('clients.allStatus') },
   ...statuses.map((value) => ({ value, label: t(`common.${value}`) })),
 ])
-const form = reactive({ clientId: '', comment: '', enabled: true, acknowledge: false })
+const form = reactive({ clientId: '', comment: '', enabled: true, acknowledge: false, locationIpOverride: '' })
 
 const deleteMessage = computed(() =>
   selected.value ? `${t('clients.deleteHint')} ${selected.value.id}` : t('clients.deleteHint')
@@ -201,7 +205,7 @@ const loadData = async () => {
 const { loading, refreshing, refresh: load } = useAutoRefresh(loadData)
 watch([search, stateFilter, statusFilter], () => { page.value = 1; void load() })
 
-const reset = () => { form.clientId = ''; form.comment = ''; form.enabled = true; form.acknowledge = false; modalError.value = '' }
+const reset = () => { form.clientId = ''; form.comment = ''; form.enabled = true; form.acknowledge = false; form.locationIpOverride = ''; modalError.value = '' }
 const closeDialog    = () => { dialog.value = ''; reset() }
 const clearEnrollment = () => { enrollmentCommands.value = {}; copied.value = false }
 const setEnrollment  = (value: { installCommands?: Record<'linux'|'darwin'|'windows', string>; installCommand?: string }) => {
@@ -209,7 +213,7 @@ const setEnrollment  = (value: { installCommands?: Record<'linux'|'darwin'|'wind
   platform.value = 'linux'
 }
 const openCreate = () => { reset(); dialog.value = 'create' }
-const openEdit   = (item: Client) => { reset(); selected.value = item; form.clientId = item.id; form.comment = item.comment; form.enabled = item.enabled; dialog.value = 'edit' }
+const openEdit   = (item: Client) => { reset(); selected.value = item; form.clientId = item.id; form.comment = item.comment; form.enabled = item.enabled; form.locationIpOverride = item.locationIpOverride || ''; dialog.value = 'edit' }
 const openRotate = (item: Client) => { reset(); selected.value = item; dialog.value = 'rotate' }
 const openDelete = (item: Client) => { selected.value = item; dialog.value = 'delete' }
 
@@ -223,7 +227,7 @@ const saveClient = async () => {
       setEnrollment(result.enrollment)
       toast.show(t('common.success'))
     } else if (selected.value) {
-      await api.updateClient(selected.value.id, { comment: form.comment, enabled: form.enabled })
+      await api.updateClient(selected.value.id, { comment: form.comment, enabled: form.enabled, locationIpOverride: form.locationIpOverride })
       toast.show(t('common.success'))
     }
     closeDialog()

@@ -11,6 +11,7 @@ import (
 	masterserver "github.com/Onicc/frp-panel/biz/master/server"
 	"github.com/Onicc/frp-panel/biz/master/shell"
 	"github.com/Onicc/frp-panel/biz/master/streamlog"
+	"github.com/Onicc/frp-panel/biz/master/v2"
 	"github.com/Onicc/frp-panel/biz/master/wg"
 	"github.com/Onicc/frp-panel/biz/master/worker"
 	"github.com/Onicc/frp-panel/conf"
@@ -234,6 +235,11 @@ func (s *server) ServerSend(sender pb.Master_ServerSendServer) error {
 				SessionId: req.GetClientId(),
 			})
 			logger.Logger(ctx).Infof("register success, event: [%s], client id: [%s]", req.GetEvent(), req.GetClientId())
+			if cliType == defs.CliTypeClient {
+				go v2.ResetAndReconcileClient(s.appInstance, req.GetClientId())
+			} else if cliType == defs.CliTypeServer {
+				go v2.ReconcileServerTunnels(s.appInstance, req.GetClientId())
+			}
 			break
 		}
 	}

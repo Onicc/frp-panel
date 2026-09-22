@@ -191,6 +191,27 @@ var migrations = []migration{
 			return nil
 		},
 	},
+	{
+		version: 6,
+		name:    "client_location_sources",
+		up: func(tx *gorm.DB) error {
+			for _, column := range []string{"ReportedIP", "ReportedAt", "LocationIPOverride"} {
+				if !tx.Migrator().HasColumn(&Client{}, column) {
+					if err := tx.Migrator().AddColumn(&Client{}, column); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		},
+	},
+	{
+		version: 7,
+		name:    "unique_tunnel_name_per_client",
+		up: func(tx *gorm.DB) error {
+			return tx.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_tunnel_client_name ON proxy_config (tenant_id, user_id, origin_client_id, name) WHERE managed_by = 'tunnel' AND deleted_at IS NULL").Error
+		},
+	},
 }
 
 func runMigrations(db *gorm.DB) error {

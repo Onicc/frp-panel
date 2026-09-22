@@ -16,6 +16,6 @@ Open **Clients → Add Client**, select Linux, macOS, or Windows, and run the ge
 
 ## 4. Create a Tunnel
 
-Open **Tunnels → Create Tunnel**, directly select a Client and Server, then configure the local service and public port. A Client may own multiple Tunnels and each may select a different Server; when the Client is online and both resources are enrolled, Master best-effort creates and shares the underlying FRPC connections. Cleanup is limited by the current Client-level removal protocol, and an Agent reconnect does not automatically re-apply v2 Tunnel configuration.
+Open **Tunnels → Create Tunnel**, directly select a Client and Server, then configure the local service and public port. A Client may own multiple Tunnels and each may select a different Server; when the Client is online and both resources are enrolled, Master best-effort creates and shares the underlying FRPC connections. Different Clients may reuse a Tunnel name, but one Client cannot. Removing the last Tunnel for a Client–Server pair stops that pair's FRPC; reconnect replays the saved desired state.
 
 See the [deployment guide](/en/deployment) for raw Compose files, environment settings, ports, acceptance checks, and backup guidance.

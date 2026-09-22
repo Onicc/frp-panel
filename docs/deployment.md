@@ -155,9 +155,11 @@ Client 上线后无需预先绑定 Server。打开 **Tunnels → 创建 Tunnel**
 2. 选择提供公网入口的 Server。
 3. 填写 TCP/UDP、本地地址、本地端口与公网端口并确认。
 
-一台 Client 可以创建多条 Tunnel，每条 Tunnel 可以选择不同 Server。Master 会保存每条 Tunnel 的期望配置，并在创建或修改时、Client 在线且 Client/Server 已完成注册时，尽力向 Client 下发组装后的 FRPC 配置；同一组合的 Tunnel 共用连接。删除 Tunnel 后，只有当该物理 Client 已没有其他活跃 Tunnel 时，当前协议才会发送 Client 级别的移除事件；如果同一 Client 仍连接其他 Server，不能保证只回收被删除组合的连接。Client 与 Server 的底层连接不作为用户资源单独管理。
+一台 Client 可以创建多条 Tunnel，每条 Tunnel 可以选择不同 Server。不同 Client 可以使用相同的 Tunnel 名称，但同一 Client 的名称必须唯一。Master 会保存每条 Tunnel 的期望配置，并在 Client 在线且 Client/Server 已完成注册时，尽力向 Client 下发组装后的 FRPC 配置；同一组合的 Tunnel 共用连接。删除该组合的最后一条 Tunnel 时，仅停止这个 Client–Server 组合的 FRPC，不影响该 Client 连向其他 Server 的连接。Client 与 Server 的底层连接不作为用户资源单独管理。
 
-公网端口监听在所选 Server（FRPS）上，并转发至所选 Client 能够访问的本地服务；业务流量不会经过 Master。Client 离线时 Tunnel 配置仍会保存，但当前 Agent 重连流程不会自动补发 v2 Tunnel 配置；待 Client 在线后，需要再次修改或提交该 Tunnel 才会触发下发。创建 Tunnel 时本地端口可使用 `1–65535`，Server 绑定端口和 remote port 必须使用 `1024–65535`。
+公网端口监听在所选 Server（FRPS）上，并转发至所选 Client 能够访问的本地服务；业务流量不会经过 Master。Client 离线时 Tunnel 配置仍会保存；Agent 重连后会清理旧运行连接并按数据库中的 Tunnel 自动重建。创建 Tunnel 时本地端口可使用 `1–65535`，Server 绑定端口和 remote port 必须使用 `1024–65535`。
+
+首页地图优先使用 Client 编辑页手工指定的公网 IP，其次使用 Client Agent 最近 24 小时的直连探测 IP，最后使用 Master 观察到的连接 IP。Agent 直连探测会绕过 `HTTP_PROXY`/`HTTPS_PROXY`，但透明代理或 TUN 模式仍可能影响结果；此时请在 Client 编辑页填写实际公网 IP。回退到 Master 观察值时，地图会明确标注“可能为代理出口”。升级已有部署以启用这些修复时，需同时更新 Master、Server 和 Client Agent；仅更新 Web 页面不足以清除 Agent 旧连接。
 
 ## 6. 网络端口
 

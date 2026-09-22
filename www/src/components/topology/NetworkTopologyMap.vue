@@ -76,7 +76,7 @@
           <span class="topology-node-kind" :class="node.kind"><Icon :name="node.kind === 'server' ? 'server' : 'users'" size="xs" /></span>
           <span class="topology-node-copy">
             <strong>{{ node.label }}</strong>
-            <small>{{ geoLabel(node) }}</small>
+            <small>{{ geoLabel(node) }} · {{ locationSourceLabel(node) }}</small>
           </span>
           <span class="topology-node-status" :class="node.status"><i></i>{{ t(`common.${node.status}`, node.status) }}</span>
         </button>
@@ -100,6 +100,8 @@
         <strong>{{ selectedNode.label }}</strong>
         <small v-if="selectedNode.locationIp">{{ selectedNode.locationIp }} · {{ geoLabel(selectedNode) }}</small>
         <small v-else>{{ t('overview.mapUnlocated') }}</small>
+        <small v-if="selectedNode.locationIp">{{ locationSourceLabel(selectedNode) }}</small>
+        <small v-if="selectedNode.observedIp && selectedNode.locationSource !== 'observed'">{{ t('overview.mapObservedIp') }}: {{ selectedNode.observedIp }}</small>
         <small v-if="selectedNode.lastSeenAt">{{ t('overview.mapLastSeen') }}: {{ formatDate(selectedNode.lastSeenAt) }}</small>
       </div>
 
@@ -172,6 +174,10 @@ const arcCandidates = computed(() => props.links.flatMap((link) => {
 }))
 const arcData = computed<ArcDatum[]>(() => routeParallelArcs(arcCandidates.value))
 const selectedNode = computed(() => props.nodes.find((node) => node.id === selectedNodeId.value))
+const locationSourceLabel = (node: TopologyNode) => {
+  if (!node.locationSource) return t('overview.mapUnlocated')
+  return t(`overview.locationSources.${node.locationSource}`)
+}
 
 watch(() => props.nodes.map((node) => node.locationIp || '').filter(Boolean).join('|'), (value) => {
   void geo.lookupMany(value ? value.split('|') : [])

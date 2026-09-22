@@ -28,26 +28,30 @@ func NewBaseFRPServerUserAuthConfig(port int, opts []v1.HTTPPluginOptions) *v1.S
 }
 
 func NewBaseFRPClientConfig(serverAddr string, serverPort int, token string) *v1.ClientCommonConfig {
+	retryLogin := false
 	resp := &v1.ClientCommonConfig{
 		Auth: v1.AuthClientConfig{
 			Method: v1.AuthMethodToken,
 			Token:  token,
 		},
-		ServerAddr: serverAddr,
-		ServerPort: serverPort,
+		ServerAddr:    serverAddr,
+		ServerPort:    serverPort,
+		LoginFailExit: &retryLogin,
 	}
 	resp.Complete()
 	return resp
 }
 
 func NewBaseFRPClientUserAuthConfig(serverAddr string, serverPort int, user, token string) *v1.ClientCommonConfig {
+	retryLogin := false
 	resp := &v1.ClientCommonConfig{
 		User: user,
 		Metadatas: map[string]string{
 			string(v1.AuthMethodToken): token,
 		},
-		ServerAddr: serverAddr,
-		ServerPort: serverPort,
+		ServerAddr:    serverAddr,
+		ServerPort:    serverPort,
+		LoginFailExit: &retryLogin,
 	}
 	resp.Complete()
 	return resp

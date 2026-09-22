@@ -3,6 +3,7 @@ package v2
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"github.com/Onicc/frp-panel/defs"
 	"github.com/Onicc/frp-panel/models"
 	"github.com/Onicc/frp-panel/services/app"
+	"github.com/Onicc/frp-panel/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -58,6 +60,105 @@ func resourceRouter(a app.Application, user *models.UserEntity) *gin.Engine {
 	r.PATCH("/tunnels/:id", patchTunnel(a))
 	r.DELETE("/tunnels/:id", deleteTunnelResource(a))
 	return r
+}
+
+func TestTunnelNameScopedToPhysicalClient(t *testing.T) {
+	a, user := resourceTestApp(t)
+	r := resourceRouter(a, user)
+	request := func(path, body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(rec, req)
+		return rec
+	}
+	for _, id := range []string{"one", "two"} {
+		if rec := request("/clients", `{"clientId":"`+id+`"}`); rec.Code != http.StatusCreated {
+			t.Fatalf("create Client %s: %d %s", id, rec.Code, rec.Body.String())
+		}
+	}
+	if rec := request("/servers", `{"serverId":"edge","address":"edge.example.test","bindPort":7001}`); rec.Code != http.StatusCreated {
+		t.Fatalf("create Server: %d %s", rec.Code, rec.Body.String())
+	}
+	for _, entry := range []struct {
+		client string
+		port   int
+	}{{"one", 60001}, {"two", 60002}} {
+		body := fmt.Sprintf(`{"name":"ssh","clientId":%q,"serverId":"edge","type":"tcp","localPort":22,"remotePort":%d}`, entry.client, entry.port)
+		if rec := request("/tunnels", body); rec.Code != http.StatusCreated {
+			t.Fatalf("same-name Tunnel on Client %s: %d %s", entry.client, rec.Code, rec.Body.String())
+		}
+	}
+	if rec := request("/tunnels", `{"name":"ssh","clientId":"one","serverId":"edge","type":"tcp","localPort":22,"remotePort":60003}`); rec.Code != http.StatusConflict {
+		t.Fatalf("same Client duplicate must conflict: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestClientLocationReportAndManualOverride(t *testing.T) {
+	a, user := resourceTestApp(t)
+	r := resourceRouter(a, user)
+	r.POST("/agent/location", reportClientLocation(a))
+	request := func(method, path, body, secret string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(method, path, bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		if secret != "" {
+			req.Header.Set("X-FRP-Panel-Client-ID", "owner.c.mac")
+			req.Header.Set("X-FRP-Panel-Client-Secret", secret)
+		}
+		r.ServeHTTP(rec, req)
+		return rec
+	}
+	if rec := request(http.MethodPost, "/clients", `{"clientId":"mac"}`, ""); rec.Code != http.StatusCreated {
+		t.Fatalf("create Client: %d %s", rec.Code, rec.Body.String())
+	}
+	db := a.GetDBManager().GetDefaultDB()
+	if err := db.Model(&models.Client{}).Where("client_id = ?", "owner.c.mac").Updates(map[string]any{
+		"connect_secret": utils.HashCredential("test-secret"), "last_seen_ip": "8.8.8.8",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if rec := request(http.MethodPost, "/agent/location", `{"ip":"1.1.1.1"}`, "wrong"); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("wrong secret: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := request(http.MethodPost, "/agent/location", `{"ip":"127.0.0.1"}`, "test-secret"); rec.Code != http.StatusBadRequest {
+		t.Fatalf("private report: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := request(http.MethodPost, "/agent/location", `{"ip":"1.1.1.1"}`, "test-secret"); rec.Code != http.StatusNoContent {
+		t.Fatalf("valid report: %d %s", rec.Code, rec.Body.String())
+	}
+	readNode := func() topologyNode {
+		t.Helper()
+		rec := request(http.MethodGet, "/topology", "", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("topology: %d %s", rec.Code, rec.Body.String())
+		}
+		var payload struct {
+			Nodes []topologyNode `json:"nodes"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil || len(payload.Nodes) != 1 {
+			t.Fatalf("topology payload: %v %s", err, rec.Body.String())
+		}
+		return payload.Nodes[0]
+	}
+	if node := readNode(); node.LocationIP != "1.1.1.1" || node.LocationSource != "agent_probe" || node.ObservedIP != "8.8.8.8" {
+		t.Fatalf("Agent report not preferred: %#v", node)
+	}
+	if rec := request(http.MethodPatch, "/clients/owner.c.mac", `{"locationIpOverride":"9.9.9.9"}`, ""); rec.Code != http.StatusOK {
+		t.Fatalf("manual override: %d %s", rec.Code, rec.Body.String())
+	}
+	if node := readNode(); node.LocationIP != "9.9.9.9" || node.LocationSource != "manual" {
+		t.Fatalf("manual override not preferred: %#v", node)
+	}
+	if rec := request(http.MethodPatch, "/clients/owner.c.mac", `{"locationIpOverride":""}`, ""); rec.Code != http.StatusOK {
+		t.Fatalf("clear override: %d %s", rec.Code, rec.Body.String())
+	}
+	if err := db.Model(&models.Client{}).Where("client_id = ?", "owner.c.mac").Update("reported_at", time.Now().Add(-48*time.Hour)).Error; err != nil {
+		t.Fatal(err)
+	}
+	if node := readNode(); node.LocationIP != "8.8.8.8" || node.LocationSource != "observed" {
+		t.Fatalf("stale report must fall back to observed IP: %#v", node)
+	}
 }
 
 func TestTunnelUpdateChangesServerAndProtectsRemotePort(t *testing.T) {

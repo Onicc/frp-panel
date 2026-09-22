@@ -36,11 +36,14 @@ type ClientEntity struct {
 	Enabled    bool       `json:"enabled" gorm:"index;default:true"`
 	EnrolledAt *time.Time `json:"enrolled_at" gorm:"index"`
 
-	LastSeenAt *time.Time `json:"last_seen_at" gorm:"index"`
-	LastSeenIP string     `json:"last_seen_ip"`
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	DeletedAt  gorm.DeletedAt `gorm:"index"`
+	LastSeenAt         *time.Time `json:"last_seen_at" gorm:"index"`
+	LastSeenIP         string     `json:"last_seen_ip"`
+	ReportedIP         string     `json:"reported_ip"`
+	ReportedAt         *time.Time `json:"reported_at"`
+	LocationIPOverride string     `json:"location_ip_override"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
 
 func (*Client) TableName() string {

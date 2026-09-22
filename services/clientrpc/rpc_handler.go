@@ -3,6 +3,7 @@ package clientrpc
 import (
 	"context"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/Onicc/frp-panel/pb"
@@ -51,6 +52,7 @@ func registerWithMaster(ctx context.Context, recvStream pb.Master_ServerSendClie
 
 func runClientRPCHandler(ctx context.Context, appInstance app.Application, recvStream pb.Master_ServerSendClient, clientID string,
 	clientHandleServerSend func(appInstance app.Application, req *pb.ServerMessage) *pb.ClientMessage) {
+	var sendMu sync.Mutex
 	for {
 		select {
 		case <-ctx.Done():
@@ -72,7 +74,7 @@ func runClientRPCHandler(ctx context.Context, appInstance app.Application, recvS
 			if resp == nil {
 				continue
 			}
-			go func() {
+			handle := func() {
 				defer func() {
 					if err := recover(); err != nil {
 						logger.Logger(ctx).Errorf("catch panic, err: %v", err)
@@ -84,9 +86,16 @@ func runClientRPCHandler(ctx context.Context, appInstance app.Application, recvS
 				}
 				msg.ClientId = clientID
 				msg.SessionId = resp.SessionId
-				recvStream.Send(msg)
+				sendMu.Lock()
+				_ = recvStream.Send(msg)
+				sendMu.Unlock()
 				logger.Logger(ctx).Infof("client resp received: %s", resp.GetClientId())
-			}()
+			}
+			if resp.GetEvent() == pb.Event_EVENT_UPDATE_FRPC || resp.GetEvent() == pb.Event_EVENT_REMOVE_FRPC {
+				handle()
+			} else {
+				go handle()
+			}
 		}
 	}
 }

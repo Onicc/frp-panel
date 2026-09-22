@@ -227,7 +227,7 @@ func ensureClientServerConnection(ctx *app.Context, client *models.ClientEntity,
 	}
 	userInfo := common.GetUserInfo(ctx)
 	config := v1.ClientConfig{ClientCommonConfig: *utils.NewBaseFRPClientUserAuthConfig(
-		server.ServerIP, serverConfig.BindPort, userInfo.GetUserName(), userInfo.GetToken(),
+		server.ServerIP, serverConfig.BindPort, utils.FRPClientUser(userInfo.GetUserName(), client.ClientID), userInfo.GetToken(),
 	)}
 	config.Metadatas[defs.FRPClientIDKey] = connection.ClientID
 	if err := connection.SetConfigContent(config); err != nil {

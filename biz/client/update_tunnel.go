@@ -12,6 +12,9 @@ import (
 
 func UpdateFrpcHander(ctx *app.Context, req *pb.UpdateFRPCRequest) (*pb.UpdateFRPCResponse, error) {
 	logger.Logger(ctx).Infof("update FRPC connection, client: [%s], server: [%s]", req.GetClientId(), req.GetServerId())
+	if req.GetClientId() == "" || req.GetServerId() == "" {
+		return &pb.UpdateFRPCResponse{Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: "clientId and serverId are required"}}, nil
+	}
 	content := req.GetConfig()
 	c, p, v, err := utils.LoadClientConfig(content, false)
 	if err != nil {
@@ -20,14 +23,17 @@ func UpdateFrpcHander(ctx *app.Context, req *pb.UpdateFRPCRequest) (*pb.UpdateFR
 			Status: &pb.Status{Code: pb.RespCode_RESP_CODE_INVALID, Message: err.Error()},
 		}, err
 	}
+	if len(p) == 0 && len(v) == 0 {
+		ctx.GetApp().GetClientController().Delete(req.GetClientId(), req.GetServerId())
+		return &pb.UpdateFRPCResponse{Status: &pb.Status{Code: pb.RespCode_RESP_CODE_SUCCESS, Message: "ok"}}, nil
+	}
 
 	cli := ctx.GetApp().GetClientController().Get(req.GetClientId(), req.GetServerId())
 	if cli != nil {
-		if reflect.DeepEqual(c, cli.GetCommonCfg()) {
+		if reflect.DeepEqual(c, cli.GetCommonCfg()) && cli.Running() {
 			logger.Logger(ctx).Warnf("client common config not changed")
 			cli.Update(p, v)
 		} else {
-			cli.Stop()
 			ctx.GetApp().GetClientController().Delete(req.GetClientId(), req.GetServerId())
 			ctx.GetApp().GetClientController().Add(req.GetClientId(), req.GetServerId(), client.NewClientHandler(c, p, v))
 			ctx.GetApp().GetClientController().Run(req.GetClientId(), req.GetServerId())
